@@ -14,7 +14,7 @@ The product’s primary value is speed and clarity: the user points their phone 
 
 ---
 
-## 2. Goals and Non-Goals
+## 2. Goals
 
 ### 2.1 Goals
 - Provide a **fast, one-handed** in-store scanning experience.
@@ -103,7 +103,7 @@ The NOVA system categorizes foods by degree and purpose of processing:
   - multiple languages → best-effort detection (v1 may prioritize English)
 
 **Acceptance Criteria**
-- Scan-to-verdict median time ≤ 3 seconds on modern devices (target; measured in QA).
+- Scan-to-verdict median time ≤ 3 seconds on modern devices 
 - User can rescan in one tap.
 
 ### 6.2 OCR Processing
