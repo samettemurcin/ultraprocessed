@@ -1,8 +1,0 @@
-R_DEF: Internal format may change without notice
-local
-color upf_accent
-color upf_background
-color upf_surface
-color upf_text
-string app_name
-style Theme.UltraProcessedDetective

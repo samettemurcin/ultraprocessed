@@ -43,3 +43,5 @@ app/build/*
 # If the old web-export runtime is used again locally, keep its generated files out of git
 Ultra Processed Food Scanner/node_modules/
 Ultra Processed Food Scanner/dist/
+app/build/
+build/
