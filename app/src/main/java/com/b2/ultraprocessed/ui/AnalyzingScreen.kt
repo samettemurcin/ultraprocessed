@@ -36,53 +36,107 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.b2.ultraprocessed.scan.LabelScanPipeline
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import com.b2.ultraprocessed.ui.theme.Emerald400
 import com.b2.ultraprocessed.ui.theme.Emerald500
 import com.b2.ultraprocessed.ui.theme.Emerald600
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 private data class Step(val text: String, val tag: String)
 
-private fun stubSteps(modelName: String) = listOf(
-    Step("Capturing image via CameraX...", "CameraX"),
-    Step("Running ML Kit Text Recognition...", "ML Kit v2"),
-    Step("Extracting ingredient list...", "OCR"),
-    Step("Sending ingredients to $modelName for NOVA classification...", "OkHttp"),
-    Step("Analyzing additives & processing level...", "LLM"),
-    Step("Generating verdict...", "Done"),
+private fun analysisSteps(
+    modelName: String,
+    isDemoAsset: Boolean,
+    isDemoText: Boolean,
+) = listOf(
+    Step(
+        when {
+            isDemoAsset -> "Loading sample image…"
+            isDemoText -> "Loading sample label text…"
+            else -> "Reading label image…"
+        },
+        if (isDemoAsset || isDemoText) "Demo" else "ML Kit",
+    ),
+    Step("Cleaning ingredient text…", "Normalize"),
+    Step("Running NOVA-style rules…", "Rules"),
+    Step("Preparing verdict…", modelName),
 )
 
 @Composable
 fun AnalyzingScreen(
+    scanSessionId: Int,
+    imagePath: String?,
+    demoAssetPath: String?,
+    demoRawIngredientText: String?,
+    minimumDisplayMillis: Long = 2600L,
     modelName: String,
-    displayDurationMillis: Long = 3500L,
-    onComplete: () -> Unit,
+    onSuccess: (ScanResultUi) -> Unit,
+    onFailure: (String) -> Unit,
 ) {
-    val steps = remember(modelName) { stubSteps(modelName) }
+    val context = LocalContext.current
+    val pipeline = remember(context) { LabelScanPipeline.create(context) }
+    val isDemoAsset = demoAssetPath != null
+    val isDemoText = demoRawIngredientText != null
+    val steps = remember(modelName, isDemoAsset, isDemoText) {
+        analysisSteps(modelName, isDemoAsset, isDemoText)
+    }
     var currentStep by remember { mutableIntStateOf(0) }
     var progress by remember { mutableFloatStateOf(0f) }
 
-    LaunchedEffect(Unit) {
-        launch {
-            while (currentStep < steps.lastIndex) {
-                delay(500)
-                currentStep += 1
+    LaunchedEffect(scanSessionId) {
+        val stepJob = launch {
+            while (isActive) {
+                delay(450)
+                currentStep = (currentStep + 1).coerceAtMost(steps.lastIndex)
             }
         }
-        launch {
-            while (progress < 100f) {
+        val progressJob = launch {
+            while (isActive && progress < 92f) {
                 delay(50)
-                progress += 2f
+                progress += 1.8f
             }
-            progress = 100f
         }
-        delay(displayDurationMillis)
-        onComplete()
+
+        val startAt = System.currentTimeMillis()
+        val outcome = runCatching {
+            when {
+                demoAssetPath != null ->
+                    pipeline.analyzeDemoAsset(context, demoAssetPath).getOrThrow()
+                demoRawIngredientText != null ->
+                    pipeline.analyzeDemoText(demoRawIngredientText).getOrThrow()
+                imagePath != null ->
+                    pipeline.analyzeImage(imagePath).getOrThrow()
+                else ->
+                    throw IllegalStateException("No scan input.")
+            }
+        }
+
+        val elapsed = System.currentTimeMillis() - startAt
+        val remaining = minimumDisplayMillis - elapsed
+        if (remaining > 0) {
+            delay(remaining)
+        }
+
+        stepJob.cancel()
+        progressJob.cancel()
+        progress = 100f
+        currentStep = steps.lastIndex
+
+        outcome.fold(
+            onSuccess = { onSuccess(it) },
+            onFailure = { e ->
+                val msg = e.message?.takeIf { it.isNotBlank() }
+                    ?: "Analysis failed. Please try again."
+                onFailure(msg)
+            },
+        )
     }
 
     val transition = rememberInfiniteTransition(label = "analysis-rings")
@@ -168,7 +222,7 @@ fun AnalyzingScreen(
                     .padding(bottom = 24.dp),
             ) {
                 LinearProgressIndicator(
-                    progress = { progress / 100f },
+                    progress = { (progress / 100f).coerceIn(0f, 1f) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(4.dp),
@@ -188,7 +242,7 @@ fun AnalyzingScreen(
                         letterSpacing = 2.sp,
                     )
                     Text(
-                        text = "${progress.toInt().coerceAtMost(100)}%",
+                        text = "${progress.toInt().coerceIn(0, 100)}%",
                         color = Emerald400.copy(alpha = 0.6f),
                         fontSize = 10.sp,
                     )

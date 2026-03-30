@@ -1,5 +1,8 @@
 package com.b2.ultraprocessed.ui
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -9,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -18,7 +22,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.History
-import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
@@ -32,7 +35,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -40,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import com.b2.ultraprocessed.ui.theme.DarkerBg
 import com.b2.ultraprocessed.ui.theme.Emerald500
+import java.io.File
 
 @Composable
 fun ResultsScreen(
@@ -48,8 +55,12 @@ fun ResultsScreen(
     onOpenHistory: () -> Unit,
 ) {
     val scrollState = rememberScrollState()
-    var showIngredients by remember { mutableStateOf(false) }
+    var showIngredients by remember { mutableStateOf(true) }
     val verdict = verdictColors(result.novaGroup)
+    val confidenceLabel = confidenceBandLabel(result.confidence)
+    val headline = shopperHeadline(result.novaGroup)
+    val emptyWatchListMessage = watchListEmptyCopy(result.novaGroup)
+    val nextSteps = nextStepLines(result.novaGroup)
 
     Column(
         modifier = Modifier
@@ -57,8 +68,8 @@ fun ResultsScreen(
             .background(DarkBg),
     ) {
         AppHeader(
-            title = "Scan result",
-            subtitle = result.productName,
+            title = "What this means",
+            subtitle = "From your ingredient label",
             navigationAction = backHeaderAction(onScanAgain),
             actions = listOf(
                 AppHeaderAction(
@@ -76,6 +87,26 @@ fun ResultsScreen(
                 .verticalScroll(scrollState)
                 .padding(horizontal = 20.dp),
         ) {
+            Text(
+                text = result.productName,
+                color = Color.White.copy(alpha = 0.92f),
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                lineHeight = 24.sp,
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            Text(
+                text = "Rules-based read · not medical advice",
+                color = Color.White.copy(alpha = 0.35f),
+                fontSize = 11.sp,
+                letterSpacing = 0.3.sp,
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            ScannedLabelPhotoSection(imagePath = result.labelImagePath)
+
+            Spacer(modifier = Modifier.height(18.dp))
+
             Surface(
                 color = verdict.cardColor,
                 shape = RoundedCornerShape(24.dp),
@@ -83,12 +114,12 @@ fun ResultsScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(
-                    modifier = Modifier.padding(24.dp),
+                    modifier = Modifier.padding(22.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(64.dp)
+                            .size(56.dp)
                             .background(verdict.pillColor, CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
@@ -96,76 +127,93 @@ fun ResultsScreen(
                             text = verdict.label.take(1),
                             color = verdict.textColor,
                             fontWeight = FontWeight.Bold,
-                            fontSize = 20.sp,
+                            fontSize = 18.sp,
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
 
                     Text(
                         text = verdict.label,
                         color = verdict.textColor,
-                        fontSize = 26.sp,
+                        fontSize = 28.sp,
                         fontWeight = FontWeight.ExtraBold,
                     )
                     Text(
-                        text = "NOVA Group ${result.novaGroup} · ${verdict.subLabel}",
+                        text = headline,
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        lineHeight = 20.sp,
+                        modifier = Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp),
+                    )
+                    Spacer(modifier = Modifier.height(14.dp))
+                    Text(
+                        text = "NOVA-style group ${result.novaGroup} · ${verdict.subLabel}",
                         color = Color.White.copy(alpha = 0.32f),
-                        fontSize = 12.sp,
+                        fontSize = 11.sp,
                         fontWeight = FontWeight.Bold,
-                        letterSpacing = 2.sp,
+                        letterSpacing = 1.6.sp,
+                    )
+                    Text(
+                        text = "$confidenceLabel signal (${(result.confidence * 100).toInt()}%) · ${result.engineLabel}",
+                        color = Color.White.copy(alpha = 0.28f),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 8.dp, start = 8.dp, end = 8.dp),
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(22.dp))
 
             Text(
-                text = result.productName,
-                color = Color.White.copy(alpha = 0.9f),
-                fontSize = 22.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            Text(
-                text = result.summary,
-                color = Color.White.copy(alpha = 0.42f),
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
-            )
-
-            Spacer(modifier = Modifier.height(18.dp))
-
-            Text(
-                text = "PROBLEM INGREDIENTS",
-                color = Color.White.copy(alpha = 0.3f),
+                text = "WHY YOU SEE THIS",
+                color = Color.White.copy(alpha = 0.32f),
                 fontSize = 10.sp,
                 fontWeight = FontWeight.Bold,
                 letterSpacing = 1.4.sp,
-                modifier = Modifier.padding(bottom = 12.dp),
             )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = result.summary,
+                color = Color.White.copy(alpha = 0.55f),
+                fontSize = 15.sp,
+                lineHeight = 22.sp,
+            )
+
+            Spacer(modifier = Modifier.height(22.dp))
+
+            Text(
+                text = "WATCH LIST (ADDITIVE CLUES)",
+                color = Color.White.copy(alpha = 0.32f),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.4.sp,
+            )
+            Spacer(modifier = Modifier.height(10.dp))
 
             if (result.problemIngredients.isEmpty()) {
                 Surface(
-                    color = Color.White.copy(alpha = 0.04f),
-                    shape = RoundedCornerShape(14.dp),
+                    color = Color.White.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(16.dp),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
                     Text(
-                        text = "No major red-flag ingredients were found in this stubbed scan.",
-                        color = Color.White.copy(alpha = 0.65f),
+                        text = emptyWatchListMessage,
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 14.sp,
+                        lineHeight = 21.sp,
                         modifier = Modifier.padding(16.dp),
                     )
                 }
             } else {
                 result.problemIngredients.forEach { ingredient ->
                     Surface(
-                        color = Color.White.copy(alpha = 0.04f),
-                        shape = RoundedCornerShape(14.dp),
+                        color = Color.White.copy(alpha = 0.05f),
+                        shape = RoundedCornerShape(16.dp),
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 8.dp),
@@ -175,20 +223,21 @@ fun ResultsScreen(
                                 Box(
                                     modifier = Modifier
                                         .size(6.dp)
-                                        .background(verdict.textColor.copy(alpha = 0.84f), CircleShape),
+                                        .background(verdict.textColor.copy(alpha = 0.9f), CircleShape),
                                 )
                                 Spacer(modifier = Modifier.width(12.dp))
                                 Text(
                                     text = ingredient.name,
-                                    color = Color.White.copy(alpha = 0.88f),
+                                    color = Color.White.copy(alpha = 0.92f),
                                     fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp,
                                 )
                             }
                             Text(
                                 text = ingredient.reason,
-                                color = Color.White.copy(alpha = 0.46f),
-                                fontSize = 12.sp,
-                                lineHeight = 18.sp,
+                                color = Color.White.copy(alpha = 0.48f),
+                                fontSize = 13.sp,
+                                lineHeight = 19.sp,
                                 modifier = Modifier.padding(start = 18.dp, top = 6.dp),
                             )
                         }
@@ -196,45 +245,88 @@ fun ResultsScreen(
                 }
             }
 
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = "YOUR NEXT MOVE",
+                color = Color.White.copy(alpha = 0.32f),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.4.sp,
+            )
             Spacer(modifier = Modifier.height(10.dp))
+            nextSteps.forEach { line ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 4.dp),
+                    horizontalArrangement = Arrangement.Start,
+                ) {
+                    Text(
+                        text = "·",
+                        color = verdict.textColor.copy(alpha = 0.85f),
+                        fontSize = 16.sp,
+                        modifier = Modifier.padding(end = 10.dp),
+                    )
+                    Text(
+                        text = line,
+                        color = Color.White.copy(alpha = 0.62f),
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(18.dp))
 
             Surface(
                 onClick = { showIngredients = !showIngredients },
-                color = Color.White.copy(alpha = 0.04f),
+                color = Color.White.copy(alpha = 0.05f),
                 shape = RoundedCornerShape(16.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = if (showIngredients) {
-                            "All Ingredients (${result.allIngredients.size})"
-                        } else {
-                            "All Ingredients (${result.allIngredients.size})"
-                        },
-                        color = Color.White.copy(alpha = 0.78f),
-                        fontWeight = FontWeight.SemiBold,
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(
+                            text = "Full ingredient list (${result.allIngredients.size})",
+                            color = Color.White.copy(alpha = 0.82f),
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 14.sp,
+                        )
+                        Text(
+                            text = if (showIngredients) "Hide" else "Show",
+                            color = Emerald500.copy(alpha = 0.85f),
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                        )
+                    }
                     if (showIngredients) {
                         Spacer(modifier = Modifier.height(12.dp))
                         Text(
                             text = result.allIngredients.joinToString(", "),
-                            color = Color.White.copy(alpha = 0.48f),
-                            lineHeight = 20.sp,
+                            color = Color.White.copy(alpha = 0.5f),
+                            lineHeight = 22.sp,
+                            fontSize = 14.sp,
                         )
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
             Text(
-                text = "NOVA Classification: A food classification system that groups foods by the extent and purpose of processing. Group 1 (unprocessed) to Group 4 (ultra-processed).",
-                color = Color.White.copy(alpha = 0.36f),
-                fontSize = 12.sp,
-                lineHeight = 18.sp,
+                text = "NOVA groups foods by processing (1 = minimal → 4 = ultra-processed). This app uses on-device rules, not a full nutrition audit.",
+                color = Color.White.copy(alpha = 0.34f),
+                fontSize = 11.sp,
+                lineHeight = 16.sp,
             )
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(36.dp))
         }
 
         Surface(
@@ -251,7 +343,7 @@ fun ResultsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
                 ) {
                     Text(
-                        text = "Scan Another Product",
+                        text = "Scan another label",
                         color = Color.Black,
                         fontWeight = FontWeight.Bold,
                     )
@@ -266,9 +358,9 @@ fun ResultsScreen(
                         .height(52.dp),
                     shape = RoundedCornerShape(16.dp),
                 ) {
-                    Icon(Icons.Default.Share, contentDescription = null)
+                    Icon(Icons.Default.History, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Open History")
+                    Text("Open history")
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -293,6 +385,103 @@ fun ResultsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun ScannedLabelPhotoSection(imagePath: String?) {
+    if (imagePath.isNullOrBlank()) return
+    val file = File(imagePath)
+    if (!file.isFile || !file.canRead()) return
+
+    val bitmap = remember(imagePath) { decodeSampledBitmap(imagePath, maxSidePx = 960) }
+    if (bitmap == null) return
+
+    Text(
+        text = "YOUR SCAN",
+        color = Color.White.copy(alpha = 0.32f),
+        fontSize = 10.sp,
+        fontWeight = FontWeight.Bold,
+        letterSpacing = 1.4.sp,
+    )
+    Spacer(modifier = Modifier.height(8.dp))
+    Surface(
+        color = Color.White.copy(alpha = 0.04f),
+        shape = RoundedCornerShape(16.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(10.dp)) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = "Scanned label photo",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 240.dp)
+                    .clip(RoundedCornerShape(12.dp)),
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "This is the image we ran through OCR. Big marketing text is read first—zoom the real ingredient list when you can.",
+                color = Color.White.copy(alpha = 0.38f),
+                fontSize = 11.sp,
+                lineHeight = 15.sp,
+            )
+        }
+    }
+}
+
+private fun decodeSampledBitmap(path: String, maxSidePx: Int): Bitmap? {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeFile(path, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+    var sample = 1
+    while (bounds.outWidth / sample > maxSidePx || bounds.outHeight / sample > maxSidePx) {
+        sample *= 2
+    }
+    val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+    return BitmapFactory.decodeFile(path, opts)
+}
+
+private fun confidenceBandLabel(confidence: Float): String = when {
+    confidence >= 0.75f -> "Strong"
+    confidence >= 0.55f -> "Moderate"
+    else -> "Low"
+}
+
+private fun shopperHeadline(novaGroup: Int): String = when (novaGroup) {
+    1 -> "Likely a simpler choice—fewer industrial additives flagged on this list."
+    2, 3 -> "Processed—compare with shorter lists and fewer additives when you can."
+    else -> "High ultra-processing risk on this label—worth swapping if you want to cut UPFs."
+}
+
+private fun watchListEmptyCopy(novaGroup: Int): String = when (novaGroup) {
+    1 ->
+        "Nothing on our additive watch list matched. That usually means fewer " +
+            "industrial-style ingredients—still check sugar, salt, and portions on the package."
+    2, 3 ->
+        "No classic ultra-processed additive hits, but the recipe still looks processed " +
+            "(e.g. salt + oils or similar). Compare with a shorter list if you want simpler food."
+    else ->
+        "We expected markers for this group—if this looks wrong, rescan with clearer lighting " +
+            "or check the full list below."
+}
+
+private fun nextStepLines(novaGroup: Int): List<String> = when (novaGroup) {
+    1 -> listOf(
+        "If the taste and price work for you, this is often an easier cart choice.",
+        "Still read the nutrition panel for sugar, sodium, and serving size.",
+        "Scan another similar product to see if another brand keeps the list shorter.",
+    )
+    2, 3 -> listOf(
+        "Pick one alternative with fewer lines in the ingredient list.",
+        "Prioritize items without emulsifiers, flavor systems, or long additive tails.",
+        "When unsure, choose the product you understand every ingredient name on.",
+    )
+    else -> listOf(
+        "Try a version with a shorter list or without industrial sweeteners and emulsifiers.",
+        "Shop the perimeter for whole foods when you want to avoid NOVA 4 patterns.",
+        "Rescan if the label was blurry—bad OCR can miss additives.",
+    )
 }
 
 private data class VerdictPalette(

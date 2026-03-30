@@ -1,7 +1,7 @@
 package com.b2.ultraprocessed.ui
 
 import androidx.activity.ComponentActivity
-import androidx.compose.ui.test.assertExists
+import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.test.onNodeWithTag
 import androidx.compose.ui.test.onNodeWithText
@@ -33,9 +33,9 @@ class AppChromeFunctionalTest {
             }
         }
 
-        composeRule.onNodeWithTag(AppTestTags.HEADER).assertExists()
-        composeRule.onNodeWithTag(AppTestTags.FOOTER).assertExists()
-        composeRule.onNodeWithText("Live scanner").assertExists()
+        composeRule.onNodeWithTag(AppTestTags.HEADER).assertIsDisplayed()
+        composeRule.onNodeWithTag(AppTestTags.FOOTER).assertIsDisplayed()
+        composeRule.onNodeWithText("Live scanner").assertIsDisplayed()
         composeRule.onNodeWithTag(AppTestTags.HEADER_ACTION_HISTORY).performClick()
         composeRule.onNodeWithTag(AppTestTags.HEADER_ACTION_SETTINGS).performClick()
 
@@ -57,9 +57,9 @@ class AppChromeFunctionalTest {
             }
         }
 
-        composeRule.onNodeWithTag(AppTestTags.HEADER).assertExists()
-        composeRule.onNodeWithTag(AppTestTags.FOOTER).assertExists()
-        composeRule.onNodeWithText("Scan result").assertExists()
-        composeRule.onNodeWithText("Strawberry Fruit Snacks").assertExists()
+        composeRule.onNodeWithTag(AppTestTags.HEADER).assertIsDisplayed()
+        composeRule.onNodeWithTag(AppTestTags.FOOTER).assertIsDisplayed()
+        composeRule.onNodeWithText("What this means").assertIsDisplayed()
+        composeRule.onNodeWithText("Strawberry Fruit Snacks").assertIsDisplayed()
     }
 }

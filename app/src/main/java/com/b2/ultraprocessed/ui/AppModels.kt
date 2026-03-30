@@ -20,6 +20,9 @@ data class ScanResultUi(
     val problemIngredients: List<ProblemIngredient>,
     val allIngredients: List<String>,
     val engineLabel: String,
+    val confidence: Float = 0f,
+    /** Local file path to the image that was analyzed (camera, gallery, or demo cache). */
+    val labelImagePath: String? = null,
 )
 
 data class HistoryItemUi(
@@ -36,6 +39,7 @@ enum class AppDestination {
     Scanner,
     Analyzing,
     Results,
+    AnalysisError,
     Settings,
     History,
 }
@@ -90,6 +94,7 @@ object StubUiData {
                 "Gelatin",
             ),
             engineLabel = "Rules + demo stub",
+            confidence = 0.88f,
         ),
         ScanResultUi(
             productName = "Whole Grain Cereal Bar",
@@ -108,6 +113,7 @@ object StubUiData {
                 "Natural Flavor",
             ),
             engineLabel = "Rules + demo stub",
+            confidence = 0.6f,
         ),
         ScanResultUi(
             productName = "Organic Mixed Nuts",
@@ -116,6 +122,7 @@ object StubUiData {
             problemIngredients = emptyList(),
             allIngredients = listOf("Almonds", "Cashews", "Walnuts", "Pecans", "Sea Salt"),
             engineLabel = "Rules fallback stub",
+            confidence = 0.62f,
         ),
     )
 
