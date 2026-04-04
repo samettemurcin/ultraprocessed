@@ -13,11 +13,16 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import com.b2.ultraprocessed.classify.ClassificationContext
+import com.b2.ultraprocessed.classify.IngredientInput
+import com.b2.ultraprocessed.classify.RulesClassifier
 import com.b2.ultraprocessed.ocr.OcrEngine
 import com.b2.ultraprocessed.ui.theme.DarkBg
+import kotlinx.coroutines.launch
 
 data class AppTimingConfig(
     val splashDurationMillis: Long = 4200L,
@@ -37,6 +42,10 @@ fun UltraProcessedApp(
     var currentResultIndex by rememberSaveable { mutableIntStateOf(0) }
     var lastCapturedPhotoPath by rememberSaveable { mutableStateOf<String?>(null) }
     var lastOcrText by rememberSaveable { mutableStateOf<String?>(null) }
+    var lastRealResult by remember { mutableStateOf<ScanResultUi?>(null) }
+    val scope = rememberCoroutineScope()
+    val classifier = remember { RulesClassifier() }
+
     val historyItems = remember {
         mutableStateListOf<HistoryItemUi>().apply {
             addAll(StubUiData.initialHistory())
@@ -63,14 +72,38 @@ fun UltraProcessedApp(
                     enableLiveCamera = enableLiveCamera,
                     onScan = { path ->
                         lastCapturedPhotoPath = path
-                        // Run real OCR on the captured image
+                        // Run real OCR on captured image
                         val bitmap = BitmapFactory.decodeFile(path)
                         if (bitmap != null) {
-                            OcrEngine.extractText(bitmap) { result ->
-                                lastOcrText = if (result.success) {
-                                    result.normalizedText
-                                } else {
-                                    result.errorMessage
+                            OcrEngine.extractText(bitmap) { ocrResult ->
+                                lastOcrText = if (ocrResult.success) ocrResult.normalizedText else null
+                                // Run RulesClassifier on OCR output
+                                if (ocrResult.success && ocrResult.normalizedText.isNotBlank()) {
+                                    scope.launch {
+                                        val classResult = classifier.classify(
+                                            input = IngredientInput(
+                                                rawText = ocrResult.rawText,
+                                                normalizedText = ocrResult.normalizedText,
+                                            ),
+                                            context = ClassificationContext(
+                                                allowNetwork = false,
+                                                apiFallbackEnabled = false,
+                                                preferOnDevice = true,
+                                            ),
+                                        )
+                                        lastRealResult = ScanResultUi(
+                                            productName = "Scanned Product",
+                                            novaGroup = classResult.novaGroup,
+                                            summary = classResult.explanation,
+                                            problemIngredients = classResult.markers.map {
+                                                ProblemIngredient(it, "Detected by rules engine.")
+                                            },
+                                            allIngredients = ocrResult.normalizedText
+                                                .split(",")
+                                                .map { it.trim() },
+                                            engineLabel = classResult.engine,
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -79,6 +112,7 @@ fun UltraProcessedApp(
                     onTryDemo = {
                         lastCapturedPhotoPath = null
                         lastOcrText = null
+                        lastRealResult = null
                         destination = AppDestination.Analyzing
                     },
                     onSettings = { destination = AppDestination.Settings },
@@ -88,13 +122,12 @@ fun UltraProcessedApp(
                 AppDestination.Analyzing -> AnalyzingScreen(
                     modelName = StubUiData.modelOptions
                         .firstOrNull { it.id == selectedModelId }
-                        ?.name
-                        ?: selectedModelId,
+                        ?.name ?: selectedModelId,
                     displayDurationMillis = timingConfig.analysisDurationMillis,
                     onComplete = {
-                        val result =
-                            StubUiData.results[currentResultIndex % StubUiData.results.size]
-                        val ocrSummary = lastOcrText
+                        val result = lastRealResult
+                            ?: StubUiData.results[currentResultIndex % StubUiData.results.size]
+
                         historyItems.add(
                             0,
                             HistoryItemUi(
@@ -102,28 +135,27 @@ fun UltraProcessedApp(
                                 productName = result.productName,
                                 novaGroup = result.novaGroup,
                                 scannedAt = "Just now",
-                                summary = if (ocrSummary != null) {
-                                    "Ingredients: $ocrSummary"
-                                } else if (lastCapturedPhotoPath != null) {
-                                    "${result.summary} Captured image stored locally."
-                                } else {
-                                    result.summary
-                                },
+                                summary = result.summary,
                                 capturedImagePath = lastCapturedPhotoPath,
                             ),
                         )
-                        currentResultIndex =
-                            (currentResultIndex + 1) % StubUiData.results.size
+                        if (lastRealResult == null) {
+                            currentResultIndex = (currentResultIndex + 1) % StubUiData.results.size
+                        }
                         destination = AppDestination.Results
                     },
                 )
 
                 AppDestination.Results -> ResultsScreen(
-                    result = StubUiData.results[
-                        (currentResultIndex + StubUiData.results.size - 1) %
-                            StubUiData.results.size
-                    ],
-                    onScanAgain = { destination = AppDestination.Scanner },
+                    result = lastRealResult
+                        ?: StubUiData.results[
+                            (currentResultIndex + StubUiData.results.size - 1) %
+                                StubUiData.results.size
+                        ],
+                    onScanAgain = {
+                        lastRealResult = null
+                        destination = AppDestination.Scanner
+                    },
                     onOpenHistory = { destination = AppDestination.History },
                 )
 
