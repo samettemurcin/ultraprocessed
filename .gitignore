@@ -18,6 +18,8 @@ out/
 *.apk
 *.ap_
 *.aab
+*.jks
+*.keystore
 
 # Native / profiling artifacts
 *.hprof
@@ -31,6 +33,8 @@ Thumbs.db
 *.log
 *.tmp
 *.swp
+*.orig
+*.rej
 
 # Project-specific generated reports and caches
 app/.DS_Store

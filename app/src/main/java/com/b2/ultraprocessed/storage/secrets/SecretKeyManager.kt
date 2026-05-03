@@ -2,41 +2,43 @@ package com.b2.ultraprocessed.storage.secrets
 
 import android.content.Context
 import androidx.security.crypto.EncryptedSharedPreferences
-import androidx.security.crypto.MasterKey
+import androidx.security.crypto.MasterKeys
 
 class SecretKeyManager(context: Context) {
+    private val appContext = context.applicationContext
 
-    // This builds the master encryption key using Android Keystore
-    private val masterKey = MasterKey.Builder(context)
-        .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
-        .build()
+    private val masterKeyAlias = MasterKeys.getOrCreate(MasterKeys.AES256_GCM_SPEC)
 
-    // This is the encrypted storage — like SharedPreferences but locked in a safe
     private val encryptedPrefs = EncryptedSharedPreferences.create(
-        context,
         "nova_secrets",
-        masterKey,
+        masterKeyAlias,
+        appContext,
         EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
-        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM,
     )
 
-    // Save an API key securely
-    fun saveApiKey(keyName: String, apiKey: String) {
-        encryptedPrefs.edit().putString(keyName, apiKey).apply()
+    fun saveApiKey(keyName: String, apiKey: String): Boolean {
+        val normalized = apiKey.trim()
+        if (normalized.isBlank()) {
+            return deleteApiKey(keyName)
+        }
+        return encryptedPrefs.edit().putString(keyName, normalized).commit()
     }
 
-    // Retrieve an API key
     fun getApiKey(keyName: String): String? {
         return encryptedPrefs.getString(keyName, null)
     }
 
-    // Delete an API key
-    fun deleteApiKey(keyName: String) {
-        encryptedPrefs.edit().remove(keyName).apply()
+    fun deleteApiKey(keyName: String): Boolean {
+        return encryptedPrefs.edit().remove(keyName).commit()
     }
 
-    // Check if a key exists without revealing it
     fun hasApiKey(keyName: String): Boolean {
         return encryptedPrefs.contains(keyName)
+    }
+
+    companion object {
+        const val LLM_API_KEY: String = "llm_api_key"
+        const val USDA_API_KEY: String = "usda_api_key"
     }
 }

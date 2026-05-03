@@ -25,10 +25,10 @@ class AppChromeFunctionalTest {
             UltraProcessedTheme {
                 ScannerScreen(
                     hasApiKey = false,
+                    hasUsdaApiKey = false,
                     enableLiveCamera = false,
                     onScan = {},
                     onBarcodeScanned = { barcodeClicks += 1 },
-                    onTryDemo = {},
                     onSettings = { settingsClicks += 1 },
                     onHistory = { historyClicks += 1 },
                 )
@@ -54,7 +54,7 @@ class AppChromeFunctionalTest {
         composeRule.setContent {
             UltraProcessedTheme {
                 ResultsScreen(
-                    result = StubUiData.results.first(),
+                    result = sampleScanResult,
                     onScanAgain = {},
                     onOpenHistory = {},
                 )
@@ -64,6 +64,21 @@ class AppChromeFunctionalTest {
         composeRule.onNodeWithTag(AppTestTags.HEADER).assertIsDisplayed()
         composeRule.onNodeWithTag(AppTestTags.FOOTER).assertIsDisplayed()
         composeRule.onNodeWithText("What this means").assertIsDisplayed()
-        composeRule.onNodeWithText("Strawberry Fruit Snacks").assertIsDisplayed()
+        composeRule.onNodeWithText("Uploaded Label Result").assertIsDisplayed()
     }
+
+    private val sampleScanResult = ScanResultUi(
+        productName = "Uploaded Label Result",
+        novaGroup = 4,
+        summary = "Flagged for multiple industrial additives and syrup-based sweeteners.",
+        problemIngredients = listOf(
+            ProblemIngredient(
+                name = "High Fructose Corn Syrup",
+                reason = "Industrial sweetener often seen in ultra-processed products.",
+            ),
+        ),
+        allIngredients = listOf("Sugar", "High Fructose Corn Syrup", "Natural Flavor"),
+        engineLabel = "Rules engine (on-device)",
+        confidence = 0.88f,
+    )
 }

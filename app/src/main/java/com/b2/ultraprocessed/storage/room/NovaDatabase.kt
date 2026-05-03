@@ -4,11 +4,13 @@ import android.content.Context
 import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 
 @Database(
     entities = [ScanResult::class],
-    version = 1,
-    exportSchema = false
+    version = 4,
+    exportSchema = true
 )
 abstract class NovaDatabase : RoomDatabase() {
 
@@ -24,11 +26,39 @@ abstract class NovaDatabase : RoomDatabase() {
                     context.applicationContext,
                     NovaDatabase::class.java,
                     "nova_database"
-                ).build()
+                ).addMigrations(*MIGRATIONS).build()
                 INSTANCE = instance
                 instance
             }
         }
+
+        private val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN productName TEXT NOT NULL DEFAULT 'Scanned label'")
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN novaGroup INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN capturedImagePath TEXT")
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN isBarcodeLookupOnly INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
+        private val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN allergens TEXT NOT NULL DEFAULT ''")
+            }
+        }
+
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN modelId TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN modelName TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN provider TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN estimatedInputTokens INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN estimatedOutputTokens INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN estimatedTotalTokens INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE scan_results ADD COLUMN estimatedCostUsd REAL NOT NULL DEFAULT 0.0")
+            }
+        }
+
+        val MIGRATIONS: Array<Migration> = arrayOf(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
     }
 }
-

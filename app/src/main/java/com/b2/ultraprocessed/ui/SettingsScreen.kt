@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.Memory
+import androidx.compose.material.icons.filled.NetworkCheck
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -32,6 +33,7 @@ import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -39,9 +41,11 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,21 +59,47 @@ import androidx.compose.ui.unit.sp
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import com.b2.ultraprocessed.ui.theme.Emerald400
 import com.b2.ultraprocessed.ui.theme.Emerald500
+import com.b2.ultraprocessed.network.llm.LlmProviderResolver
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+
+data class KeyMetadata(
+    val modelName: String,
+    val provider: String,
+    val acceptsImages: Boolean,
+)
+
+data class KeySaveResult(
+    val success: Boolean,
+    val message: String,
+)
+
+private enum class PingStatus {
+    Idle,
+    Loading,
+    Success,
+    Failure,
+}
 
 @Composable
 fun SettingsScreen(
-    apiKey: String,
+    hasLlmApiKey: Boolean,
     selectedModelId: String,
     modelOptions: List<ModelOption>,
+    llmKeyMetadata: KeyMetadata? = null,
     onBack: () -> Unit,
-    onApiKeySaved: (String) -> Unit,
+    onLlmApiKeySaved: suspend (String) -> KeySaveResult,
+    onLlmApiKeyPing: suspend (String?) -> KeySaveResult,
+    onLlmApiKeyDeleted: suspend () -> Boolean,
     onModelSelected: (String) -> Unit,
 ) {
-    var localKey by remember(apiKey) { mutableStateOf(apiKey) }
-    var showKey by remember { mutableStateOf(false) }
-    var saved by remember { mutableStateOf(false) }
-    var showModelPicker by remember { mutableStateOf(false) }
-    val selectedModel = modelOptions.firstOrNull { it.id == selectedModelId }
+    val selectedModel = modelOptions.firstOrNull { it.id == selectedModelId } ?: modelOptions.firstOrNull()
+
+    LaunchedEffect(selectedModelId, modelOptions) {
+        if (selectedModel == null && modelOptions.isNotEmpty()) {
+            onModelSelected(modelOptions.first().id)
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -88,180 +118,27 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
-            SectionHeader(icon = Icons.Default.Key, text = "API Key")
-            Surface(
-                color = Color.White.copy(alpha = 0.04f),
-                shape = RoundedCornerShape(22.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(modifier = Modifier.padding(18.dp)) {
-                    Text(
-                        text = "Your API key is stored locally in the Android Keystore and never leaves your device. It is used to call the LLM for ingredient classification.",
-                        color = Color.White.copy(alpha = 0.45f),
-                        lineHeight = 19.sp,
+            SectionHeader(icon = Icons.Default.Key, text = "LLM API Key")
+            SecureApiKeyCard(
+                hasKey = hasLlmApiKey,
+                storedDescription = "An LLM API key is stored locally with Android Keystore-backed encryption. Enter a new key only when you want to replace it.",
+                emptyDescription = "Your LLM API key is stored locally with Android Keystore-backed encryption. The saved value is never shown again after it is stored.",
+                emptyLabel = "LLM API key",
+                replacementLabel = "Replacement LLM API key",
+                saveLabel = "Save LLM key",
+                replaceLabel = "Replace LLM key",
+                deleteLabel = "Delete LLM key",
+                metadata = llmKeyMetadata ?: selectedModel?.let {
+                    KeyMetadata(
+                        modelName = it.name,
+                        provider = it.provider,
+                        acceptsImages = it.supportsImages,
                     )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    OutlinedTextField(
-                        value = localKey,
-                        onValueChange = {
-                            localKey = it
-                            saved = false
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text("API key") },
-                        singleLine = true,
-                        visualTransformation = if (showKey) {
-                            VisualTransformation.None
-                        } else {
-                            PasswordVisualTransformation()
-                        },
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        trailingIcon = {
-                            Row {
-                                IconButton(onClick = { showKey = !showKey }) {
-                                    Icon(
-                                        imageVector = if (showKey) {
-                                            Icons.Default.VisibilityOff
-                                        } else {
-                                            Icons.Default.Visibility
-                                        },
-                                        contentDescription = "Toggle visibility",
-                                    )
-                                }
-                                if (localKey.isNotBlank()) {
-                                    IconButton(
-                                        onClick = {
-                                            localKey = ""
-                                            onApiKeySaved("")
-                                            saved = false
-                                        },
-                                    ) {
-                                        Icon(Icons.Default.Clear, contentDescription = "Clear")
-                                    }
-                                }
-                            }
-                        },
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Emerald500,
-                            unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
-                            focusedTextColor = Color.White,
-                            unfocusedTextColor = Color.White.copy(alpha = 0.84f),
-                            focusedLabelColor = Emerald400,
-                            unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
-                        ),
-                    )
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Button(
-                            onClick = {
-                                onApiKeySaved(localKey)
-                                saved = true
-                            },
-                            colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
-                            shape = RoundedCornerShape(14.dp),
-                        ) {
-                            if (saved) {
-                                Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Saved", color = Color.Black)
-                            } else {
-                                Text("Save key", color = Color.Black)
-                            }
-                        }
-                        AssistChip(onClick = {}, label = { Text(if (apiKey.isBlank()) "No key saved" else "Key present") })
-                    }
-                }
-            }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            SectionHeader(icon = Icons.Default.Memory, text = "LLM Model")
-            Surface(
-                onClick = { showModelPicker = !showModelPicker },
-                color = Color.White.copy(alpha = 0.04f),
-                shape = RoundedCornerShape(22.dp),
-                modifier = Modifier.fillMaxWidth(),
-            ) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = selectedModel?.name ?: "Select Model",
-                        color = Color.White.copy(alpha = 0.82f),
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "${selectedModel?.provider ?: ""} · ${selectedModel?.description ?: ""}",
-                        color = Color.White.copy(alpha = 0.34f),
-                        fontSize = 12.sp,
-                    )
-                }
-            }
-            if (showModelPicker) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    modelOptions.forEach { option ->
-                        val selected = option.id == selectedModelId
-                        Surface(
-                            onClick = {
-                                onModelSelected(option.id)
-                                showModelPicker = false
-                            },
-                            color = if (selected) Color(0x1410B981) else Color.White.copy(alpha = 0.03f),
-                            shape = RoundedCornerShape(18.dp),
-                            modifier = Modifier.fillMaxWidth(),
-                            border = BorderStroke(
-                                width = 1.dp,
-                                color = if (selected) {
-                                    Emerald500.copy(alpha = 0.55f)
-                                } else {
-                                    Color.White.copy(alpha = 0.08f)
-                                },
-                            ),
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                            ) {
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
-                                        Text(
-                                            text = option.name,
-                                            color = if (selected) Emerald400 else Color.White.copy(alpha = 0.72f),
-                                            fontWeight = FontWeight.SemiBold,
-                                        )
-                                        if (option.recommended) {
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Box(
-                                                modifier = Modifier
-                                                    .background(Emerald500.copy(alpha = 0.14f), CircleShape)
-                                                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                                            ) {
-                                                Text(
-                                                    text = "Recommended",
-                                                    color = Emerald400,
-                                                    fontSize = 11.sp,
-                                                )
-                                            }
-                                        }
-                                    }
-                                    Spacer(modifier = Modifier.height(4.dp))
-                                    Text(
-                                        text = "${option.provider} · ${option.description}",
-                                        color = Color.White.copy(alpha = 0.32f),
-                                        fontSize = 12.sp,
-                                    )
-                                }
-                                if (selected) {
-                                    Icon(Icons.Default.Check, contentDescription = null, tint = Emerald400)
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+                },
+                onSave = onLlmApiKeySaved,
+                onPing = onLlmApiKeyPing,
+                onDelete = onLlmApiKeyDeleted,
+            )
 
             Spacer(modifier = Modifier.height(24.dp))
 
@@ -301,7 +178,7 @@ fun SettingsScreen(
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "No sign-in required. No data leaves your device except the ingredient text sent to your chosen LLM provider. Scan history stays in local Room DB. API keys are encrypted via Android Keystore. DataStore handles preferences.",
+                        text = "No sign-in required. When an LLM key is saved, label images are sent for ingredient extraction and extracted ingredient text is sent for classification and allergen detection. Scan history stays in local Room DB. API keys are encrypted via Android Keystore. DataStore handles preferences.",
                         color = Color.White.copy(alpha = 0.34f),
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
@@ -349,6 +226,313 @@ private fun SectionHeader(
         )
     }
 }
+
+@Composable
+private fun SecureApiKeyCard(
+    hasKey: Boolean,
+    storedDescription: String,
+    emptyDescription: String,
+    emptyLabel: String,
+    replacementLabel: String,
+    saveLabel: String,
+    replaceLabel: String,
+    deleteLabel: String,
+    metadata: KeyMetadata?,
+    onSave: suspend (String) -> KeySaveResult,
+    onPing: (suspend (String?) -> KeySaveResult)?,
+    onDelete: suspend () -> Boolean,
+) {
+    val scope = rememberCoroutineScope()
+    var localKey by remember { mutableStateOf("") }
+    var showKey by remember { mutableStateOf(false) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
+    var isSaving by remember { mutableStateOf(false) }
+    var pingStatus by remember { mutableStateOf(PingStatus.Idle) }
+    var pingMessage by remember { mutableStateOf<String?>(null) }
+    val detectedMetadata = LlmProviderResolver.detectProvider(localKey)?.let { providerId ->
+        LlmProviderResolver.defaultModelForProvider(providerId)?.let {
+            KeyMetadata(
+                modelName = it.modelName,
+                provider = it.provider,
+                acceptsImages = it.acceptsImages,
+            )
+        }
+    }
+    val displayMetadata = detectedMetadata ?: metadata
+
+    suspend fun pingCurrentKey(key: String?): KeySaveResult? {
+        if (onPing == null) return null
+        pingStatus = PingStatus.Loading
+        val result = onPing(key)
+        pingStatus = if (result.success) PingStatus.Success else PingStatus.Failure
+        pingMessage = result.message
+        return result
+    }
+
+    LaunchedEffect(hasKey, localKey) {
+        if (onPing == null) return@LaunchedEffect
+        if (!hasKey && localKey.isBlank()) return@LaunchedEffect
+        if (localKey.isNotBlank()) {
+            delay(650)
+            pingCurrentKey(localKey)
+        } else {
+            pingCurrentKey(null)
+        }
+    }
+
+    Surface(
+        color = Color.White.copy(alpha = 0.04f),
+        shape = RoundedCornerShape(22.dp),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(18.dp)) {
+            Text(
+                text = if (hasKey) storedDescription else emptyDescription,
+                color = Color.White.copy(alpha = 0.45f),
+                lineHeight = 19.sp,
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            OutlinedTextField(
+                value = localKey,
+                onValueChange = {
+                    localKey = it
+                    statusMessage = null
+                },
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text(if (hasKey) replacementLabel else emptyLabel) },
+                singleLine = true,
+                visualTransformation = if (showKey) {
+                    VisualTransformation.None
+                } else {
+                    PasswordVisualTransformation()
+                },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                trailingIcon = {
+                    Row {
+                        IconButton(onClick = { showKey = !showKey }) {
+                            Icon(
+                                imageVector = if (showKey) {
+                                    Icons.Default.VisibilityOff
+                                } else {
+                                    Icons.Default.Visibility
+                                },
+                                contentDescription = "Toggle visibility",
+                            )
+                        }
+                        if (localKey.isNotBlank()) {
+                            IconButton(
+                                onClick = {
+                                    localKey = ""
+                                    statusMessage = null
+                                },
+                            ) {
+                                Icon(Icons.Default.Clear, contentDescription = "Clear typed key")
+                            }
+                        }
+                    }
+                },
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Emerald500,
+                    unfocusedBorderColor = Color.White.copy(alpha = 0.12f),
+                    focusedTextColor = Color.White,
+                    unfocusedTextColor = Color.White.copy(alpha = 0.84f),
+                    focusedLabelColor = Emerald400,
+                    unfocusedLabelColor = Color.White.copy(alpha = 0.5f),
+                ),
+            )
+            Spacer(modifier = Modifier.height(14.dp))
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Button(
+                    onClick = {
+                        if (isSaving) return@Button
+                        isSaving = true
+                        scope.launch {
+                            try {
+                                val result = onSave(localKey)
+                                if (result.success) {
+                                    localKey = ""
+                                    showKey = false
+                                    pingStatus = PingStatus.Success
+                                } else {
+                                    pingStatus = PingStatus.Failure
+                                }
+                                statusMessage = result.message
+                                pingMessage = result.message
+                            } finally {
+                                isSaving = false
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
+                    shape = RoundedCornerShape(14.dp),
+                    enabled = localKey.isNotBlank(),
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    if (isSaving) {
+                        CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.Black, strokeWidth = 2.dp)
+                    } else {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(if (hasKey) replaceLabel else saveLabel, color = Color.Black)
+                    }
+                }
+                if (onPing != null) {
+                    Button(
+                        onClick = {
+                            if (isSaving) return@Button
+                            isSaving = true
+                            scope.launch {
+                                try {
+                                    val result = pingCurrentKey(localKey.takeIf { it.isNotBlank() })
+                                    statusMessage = result?.message
+                                } finally {
+                                    isSaving = false
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.08f),
+                            contentColor = Color.White.copy(alpha = 0.9f),
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        enabled = hasKey || localKey.isNotBlank(),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White.copy(alpha = 0.9f), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.NetworkCheck, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text("Ping API")
+                        }
+                    }
+                }
+                if (hasKey) {
+                    Button(
+                        onClick = {
+                            if (isSaving) return@Button
+                            isSaving = true
+                            scope.launch {
+                                try {
+                                    val deleted = onDelete()
+                                    if (deleted) {
+                                        localKey = ""
+                                        showKey = false
+                                        statusMessage = "Saved key deleted."
+                                    } else {
+                                        statusMessage = "Could not delete key. Please try again."
+                                    }
+                                } finally {
+                                    isSaving = false
+                                }
+                            }
+                        },
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.08f),
+                            contentColor = Color.White.copy(alpha = 0.78f),
+                        ),
+                        shape = RoundedCornerShape(14.dp),
+                        enabled = true,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        if (isSaving) {
+                            CircularProgressIndicator(modifier = Modifier.size(18.dp), color = Color.White.copy(alpha = 0.78f), strokeWidth = 2.dp)
+                        } else {
+                            Icon(Icons.Default.Clear, contentDescription = null)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(deleteLabel)
+                        }
+                    }
+                }
+                AssistChip(
+                    onClick = {},
+                    label = { Text(if (hasKey) "Key stored" else "No key stored") },
+                )
+                if (onPing != null) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = when (pingStatus) {
+                                PingStatus.Success -> Icons.Default.Check
+                                PingStatus.Failure -> Icons.Default.Clear
+                                PingStatus.Loading -> Icons.Default.NetworkCheck
+                                PingStatus.Idle -> Icons.Default.NetworkCheck
+                            },
+                            contentDescription = null,
+                            tint = when (pingStatus) {
+                                PingStatus.Success -> Emerald500
+                                PingStatus.Failure -> Color(0xFFF87171)
+                                PingStatus.Loading -> Color.White.copy(alpha = 0.45f)
+                                PingStatus.Idle -> Color.White.copy(alpha = 0.25f)
+                            },
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = when (pingStatus) {
+                                PingStatus.Success -> pingMessage ?: "Auto-verified"
+                                PingStatus.Failure -> pingMessage ?: "Key verification failed"
+                                PingStatus.Loading -> "Verifying key..."
+                                PingStatus.Idle -> "Auto-verification runs on save and when the key changes."
+                            },
+                            color = when (pingStatus) {
+                                PingStatus.Success -> Emerald500
+                                PingStatus.Failure -> Color(0xFFF87171)
+                                PingStatus.Loading -> Color.White.copy(alpha = 0.38f)
+                                PingStatus.Idle -> Color.White.copy(alpha = 0.24f)
+                            },
+                            fontSize = 11.sp,
+                        )
+                    }
+                }
+                displayMetadata?.let {
+                    Surface(
+                        color = Color.White.copy(alpha = 0.03f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                            Text(
+                                text = "API Metadata",
+                                color = Emerald400.copy(alpha = 0.72f),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Model: ${it.modelName}",
+                                color = Color.White.copy(alpha = 0.72f),
+                                fontSize = 12.sp,
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Provider: ${it.provider}",
+                                color = Color.White.copy(alpha = 0.58f),
+                                fontSize = 12.sp,
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = "Accepts images: ${if (it.acceptsImages) "Yes" else "No"}",
+                                color = Color.White.copy(alpha = 0.58f),
+                                fontSize = 12.sp,
+                            )
+                        }
+                    }
+                }
+            }
+            statusMessage?.let { message ->
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = message,
+                    color = Color.White.copy(alpha = 0.45f),
+                    fontSize = 12.sp,
+                )
+            }
+        }
+    }
+}
+
 
 @Composable
 private fun TechRow(

@@ -71,13 +71,56 @@ class UsdaRepositoryTest {
         )
         assertNull(repo.lookupByBarcode("078742195760"))
     }
+
+    @Test
+    fun lookupByBarcode_usesInMemoryCacheForRepeatedHits() = runTest {
+        val dataSource = FakeUsdaApiDataSource(
+            searchFoods = listOf(
+                UsdaSearchFood(
+                    fdcId = 2L,
+                    description = "Correct product",
+                    dataType = "Branded",
+                    brandOwner = "Brand B",
+                    gtinUpc = "078742195760",
+                    ingredients = "BEEF, BUN",
+                ),
+            ),
+            detailById = mapOf(
+                2L to UsdaFoodDetail(
+                    fdcId = 2L,
+                    description = "Correct product",
+                    brandOwner = "Brand B",
+                    gtinUpc = "078742195760",
+                    ingredients = "BEEF, BUN",
+                ),
+            ),
+        )
+        val repo = UsdaRepository(dataSource)
+
+        assertNotNull(repo.lookupByBarcode("078742195760"))
+        assertNotNull(repo.lookupByBarcode("078742195760"))
+
+        assertEquals(1, dataSource.searchCallCount)
+        assertEquals(1, dataSource.detailCallCount)
+    }
 }
 
 private class FakeUsdaApiDataSource(
     private val searchFoods: List<UsdaSearchFood>,
     private val detailById: Map<Long, UsdaFoodDetail> = emptyMap(),
 ) : UsdaApiDataSource {
-    override suspend fun searchFoods(query: String, pageSize: Int): List<UsdaSearchFood> = searchFoods
+    var searchCallCount: Int = 0
+        private set
+    var detailCallCount: Int = 0
+        private set
 
-    override suspend fun fetchFoodDetail(fdcId: Long): UsdaFoodDetail? = detailById[fdcId]
+    override suspend fun searchFoods(query: String, pageSize: Int): List<UsdaSearchFood> {
+        searchCallCount += 1
+        return searchFoods
+    }
+
+    override suspend fun fetchFoodDetail(fdcId: Long): UsdaFoodDetail? {
+        detailCallCount += 1
+        return detailById[fdcId]
+    }
 }

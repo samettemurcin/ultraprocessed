@@ -16,9 +16,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Money
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -33,10 +36,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import com.b2.ultraprocessed.ui.theme.Emerald400
+import com.b2.ultraprocessed.ui.theme.Emerald500
+import java.util.Locale
 
 @Composable
 fun HistoryScreen(
     historyItems: List<HistoryItemUi>,
+    historySummary: HistoryUsageSummaryUi,
     onBack: () -> Unit,
     onClearItem: (HistoryItemUi) -> Unit,
 ) {
@@ -50,6 +56,8 @@ fun HistoryScreen(
             subtitle = AppBrand.name,
             navigationAction = backHeaderAction(onBack),
         )
+
+        UsageSummaryCard(summary = historySummary)
 
         Surface(
             color = Color.White.copy(alpha = 0.03f),
@@ -66,7 +74,7 @@ fun HistoryScreen(
                 Icon(Icons.Default.Warning, contentDescription = null, tint = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(14.dp))
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "Stored locally via Room DB · Session only · No cloud sync",
+                    text = "Stored locally via Room DB · No cloud sync",
                     color = Color.White.copy(alpha = 0.25f),
                     fontSize = 11.sp,
                 )
@@ -81,7 +89,7 @@ fun HistoryScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No scans yet. Run the demo flow from the scanner screen.",
+                    text = "No scans yet. Scan or upload an ingredient label to build local history.",
                     color = Color.White.copy(alpha = 0.4f),
                 )
             }
@@ -149,6 +157,18 @@ fun HistoryScreen(
                                         fontSize = 10.sp,
                                     )
                                 }
+                                if (item.estimatedTokens > 0 || item.modelName.isNotBlank()) {
+                                    Spacer(modifier = Modifier.height(3.dp))
+                                    Text(
+                                        text = listOfNotNull(
+                                            item.modelName.takeIf { it.isNotBlank() },
+                                            if (item.estimatedTokens > 0) "${formatTokens(item.estimatedTokens)} tokens" else null,
+                                            if (item.estimatedCostUsd > 0.0) formatMoney(item.estimatedCostUsd) + " est." else null,
+                                        ).joinToString(" · "),
+                                        color = Color.White.copy(alpha = 0.22f),
+                                        fontSize = 10.sp,
+                                    )
+                                }
                             }
                             Text(
                                 text = verdict.first,
@@ -184,4 +204,127 @@ fun HistoryScreen(
             modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
         )
     }
+}
+
+@Composable
+private fun UsageSummaryCard(
+    summary: HistoryUsageSummaryUi,
+) {
+    Surface(
+        color = Color.White.copy(alpha = 0.04f),
+        shape = RoundedCornerShape(22.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Emerald500.copy(alpha = 0.12f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp, vertical = 8.dp),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(34.dp)
+                        .background(Emerald500.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Default.Money, contentDescription = null, tint = Emerald400, modifier = Modifier.size(18.dp))
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Usage snapshot",
+                        color = Color.White.copy(alpha = 0.72f),
+                        fontWeight = FontWeight.SemiBold,
+                    )
+                    Text(
+                        text = "${summary.totalScans} scans · estimated from stored model usage",
+                        color = Color.White.copy(alpha = 0.34f),
+                        fontSize = 11.sp,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
+                MetricPill(
+                    label = "Tokens",
+                    value = formatTokens(summary.totalTokens),
+                    modifier = Modifier.weight(1f),
+                )
+                MetricPill(
+                    label = "Estimated cost",
+                    value = formatMoney(summary.estimatedCostUsd),
+                    modifier = Modifier.weight(1f),
+                )
+            }
+
+            if (summary.modelUsage.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(14.dp))
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    summary.modelUsage.take(4).forEach { usage ->
+                        Surface(
+                            color = Color.White.copy(alpha = 0.03f),
+                            shape = RoundedCornerShape(14.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+                        ) {
+                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
+                                Text(
+                                    text = usage.modelName,
+                                    color = Color.White.copy(alpha = 0.78f),
+                                    fontSize = 12.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "${usage.scans} scan${if (usage.scans == 1) "" else "s"} · ${formatTokens(usage.estimatedTokens)} tokens · ${formatMoney(usage.estimatedCostUsd)}",
+                                    color = Color.White.copy(alpha = 0.32f),
+                                    fontSize = 10.sp,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MetricPill(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        color = Color.White.copy(alpha = 0.03f),
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+        modifier = modifier,
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+            Text(
+                text = label,
+                color = Color.White.copy(alpha = 0.34f),
+                fontSize = 11.sp,
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = value,
+                color = Color.White.copy(alpha = 0.92f),
+                fontSize = 18.sp,
+                fontWeight = FontWeight.SemiBold,
+            )
+        }
+    }
+}
+
+private fun formatTokens(tokens: Int): String {
+    return String.format(Locale.US, "%,d", tokens.coerceAtLeast(0))
+}
+
+private fun formatMoney(value: Double): String {
+    return String.format(Locale.US, "$%.4f", value.coerceAtLeast(0.0))
 }

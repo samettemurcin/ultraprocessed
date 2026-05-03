@@ -62,9 +62,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.camera.view.PreviewView
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.content.ContextCompat
-import com.b2.ultraprocessed.BuildConfig
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.b2.ultraprocessed.barcode.BarcodeLiveScanController
 import com.b2.ultraprocessed.camera.CameraCaptureController
 import com.b2.ultraprocessed.camera.LocalImageImportController
@@ -76,7 +75,7 @@ import com.b2.ultraprocessed.ui.theme.Emerald400
 import com.b2.ultraprocessed.ui.theme.Emerald500
 
 private enum class ScannerMode {
-    /** Preview + still capture for ingredient OCR path. */
+    /** Preview + still capture for the food-label analysis path. */
     Label,
     /** Preview + ML Kit live barcode → USDA path. */
     BarcodeLive,
@@ -85,10 +84,10 @@ private enum class ScannerMode {
 @Composable
 fun ScannerScreen(
     hasApiKey: Boolean,
+    hasUsdaApiKey: Boolean,
     enableLiveCamera: Boolean = true,
     onScan: (String) -> Unit,
     onBarcodeScanned: (String) -> Unit,
-    onTryDemo: () -> Unit,
     onSettings: () -> Unit,
     onHistory: () -> Unit,
 ) {
@@ -113,7 +112,6 @@ fun ScannerScreen(
     var isCameraPipelineReady by remember { mutableStateOf(false) }
     /** False until live barcode analysis use case is bound. */
     var isBarcodeLiveReady by remember { mutableStateOf(false) }
-    val hasUsdaKey = remember { BuildConfig.USDA_API_KEY.isNotBlank() }
     var useFrontCamera by rememberSaveable { mutableStateOf(false) }
     val cameraSelector = remember(useFrontCamera) {
         if (useFrontCamera) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
@@ -218,7 +216,7 @@ fun ScannerScreen(
             ),
         )
 
-        if (!hasUsdaKey) {
+        if (!hasUsdaApiKey) {
             Surface(
                 color = Amber500.copy(alpha = 0.1f),
                 shape = RoundedCornerShape(14.dp),
@@ -241,7 +239,7 @@ fun ScannerScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Add USDA_API_KEY in local.properties for barcode → USDA product lookup.",
+                        text = "Add a USDA API key in Settings for barcode → USDA product lookup.",
                         color = Amber400.copy(alpha = 0.84f),
                         fontSize = 12.sp,
                     )
@@ -273,7 +271,7 @@ fun ScannerScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Optional: add an API key in Settings for future cloud models.",
+                        text = "Add an LLM API key in Settings for image extraction, NOVA classification, and allergen detection.",
                         color = Amber400.copy(alpha = 0.72f),
                         fontSize = 12.sp,
                     )
@@ -360,7 +358,7 @@ fun ScannerScreen(
                                 text = if (enableLiveCamera) {
                                     "Camera access needed"
                                 } else {
-                                    "Scanner preview stub"
+                                    "Scanner preview disabled"
                                 },
                                 color = Color.White.copy(alpha = 0.82f),
                                 fontWeight = FontWeight.SemiBold,
@@ -478,9 +476,9 @@ fun ScannerScreen(
                 Text(
                     text = when (scannerMode) {
                         ScannerMode.Label -> if (useFrontCamera) {
-                            "Front camera · ML Kit OCR"
+                            "Front camera · label analysis ready"
                         } else {
-                            "CameraX Preview · ML Kit OCR Ready"
+                            "CameraX Preview · label analysis ready"
                         }
                         ScannerMode.BarcodeLive -> if (useFrontCamera) {
                             "Front camera · live barcode"
@@ -543,7 +541,7 @@ fun ScannerScreen(
                 Button(
                     onClick = {
                         if (!enableLiveCamera) {
-                            onScan("stubbed://local-capture.jpg")
+                            cameraStatusMessage = "Camera preview is disabled in this build."
                             return@Button
                         }
 
@@ -617,9 +615,9 @@ fun ScannerScreen(
                         }
                         cameraStatusMessage = null
                         scannerMode = ScannerMode.BarcodeLive
-                        if (!hasUsdaKey) {
+                        if (!hasUsdaApiKey) {
                             cameraStatusMessage =
-                                "USDA_API_KEY missing in local.properties — barcode lookup will not find products."
+                                "USDA API key missing in Settings — barcode lookup will not find products."
                         }
                     },
                     color = Color.White.copy(alpha = 0.04f),
@@ -686,7 +684,7 @@ fun ScannerScreen(
                     color = Color.White.copy(alpha = 0.04f),
                     shape = RoundedCornerShape(12.dp),
                     modifier = Modifier
-                        .weight(1f)
+                        .fillMaxWidth()
                         .testTag(AppTestTags.SCANNER_UPLOAD_BUTTON),
                 ) {
                     Row(
@@ -708,30 +706,6 @@ fun ScannerScreen(
                         )
                     }
                 }
-
-                Surface(
-                    onClick = {
-                        scannerMode = ScannerMode.Label
-                        onTryDemo()
-                    },
-                    color = Color.White.copy(alpha = 0.04f),
-                    shape = RoundedCornerShape(12.dp),
-                    modifier = Modifier
-                        .weight(1f)
-                        .testTag(AppTestTags.SCANNER_DEMO_BUTTON),
-                ) {
-                    Row(
-                        modifier = Modifier.padding(vertical = 12.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Text(
-                            text = "Try Demo",
-                            color = Color.White.copy(alpha = 0.5f),
-                            fontSize = 12.sp,
-                        )
-                    }
-                }
             }
 
             if (cameraStatusMessage != null) {
@@ -747,7 +721,7 @@ fun ScannerScreen(
                     text = if (enableLiveCamera) {
                         "Captured and imported photos are stored locally on this device."
                     } else {
-                        "Scanner actions are running in stub mode for testing."
+                        "Scanner actions are running with live camera disabled for tests."
                     },
                     color = Color.White.copy(alpha = 0.25f),
                     fontSize = 11.sp,

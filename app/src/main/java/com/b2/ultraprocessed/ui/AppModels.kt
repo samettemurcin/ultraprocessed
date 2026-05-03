@@ -5,12 +5,29 @@ data class ModelOption(
     val name: String,
     val provider: String,
     val description: String,
+    val supportsImages: Boolean = false,
     val recommended: Boolean = false,
 )
 
 data class ProblemIngredient(
     val name: String,
     val reason: String,
+)
+
+data class IngredientBubbleUi(
+    val name: String,
+    val novaGroup: Int,
+    val reason: String,
+)
+
+data class UsageEstimateUi(
+    val modelId: String,
+    val modelName: String,
+    val provider: String,
+    val estimatedInputTokens: Int,
+    val estimatedOutputTokens: Int,
+    val estimatedTotalTokens: Int,
+    val estimatedCostUsd: Double,
 )
 
 data class ScanResultUi(
@@ -23,12 +40,16 @@ data class ScanResultUi(
     val confidence: Float = 0f,
     val sourceLabel: String = "OCR",
     val warnings: List<String> = emptyList(),
-    /** Local file path to the image that was analyzed (camera, gallery, or demo cache). */
+    val allergens: List<String> = emptyList(),
+    val ingredientAssessments: List<IngredientBubbleUi> = emptyList(),
+    val rawIngredientText: String = "",
+    /** Local file path to the image that was analyzed from camera or gallery import. */
     val labelImagePath: String? = null,
     /** Barcode → USDA path: show product identity only until OCR/classification is wired. */
     val isBarcodeLookupOnly: Boolean = false,
     val scannedBarcode: String? = null,
     val brandOwner: String? = null,
+    val usageEstimate: UsageEstimateUi? = null,
 )
 
 data class HistoryItemUi(
@@ -39,6 +60,45 @@ data class HistoryItemUi(
     val summary: String,
     val capturedImagePath: String? = null,
     val isBarcodeLookupOnly: Boolean = false,
+    val modelName: String = "",
+    val provider: String = "",
+    val estimatedTokens: Int = 0,
+    val estimatedCostUsd: Double = 0.0,
+)
+
+enum class ResultChatRole {
+    User,
+    Assistant,
+    System,
+}
+
+data class ResultChatMessageUi(
+    val id: String,
+    val role: ResultChatRole,
+    val text: String,
+    val allowed: Boolean = true,
+)
+
+data class ResultChatStateUi(
+    val messages: List<ResultChatMessageUi> = emptyList(),
+    val input: String = "",
+    val isSending: Boolean = false,
+    val statusMessage: String? = null,
+)
+
+data class ModelUsageUi(
+    val modelName: String,
+    val provider: String,
+    val scans: Int,
+    val estimatedTokens: Int,
+    val estimatedCostUsd: Double,
+)
+
+data class HistoryUsageSummaryUi(
+    val totalScans: Int,
+    val totalTokens: Int,
+    val estimatedCostUsd: Double,
+    val modelUsage: List<ModelUsageUi>,
 )
 
 enum class AppDestination {
@@ -51,130 +111,36 @@ enum class AppDestination {
     History,
 }
 
-object StubUiData {
+object AppCatalog {
     val modelOptions = listOf(
         ModelOption(
             id = "gemini-2.0-flash",
             name = "Gemini 2.0 Flash",
-            provider = "Google",
-            description = "Fast, free tier available",
+            provider = "Gemini (Google)",
+            description = "Default image analysis model",
+            supportsImages = true,
             recommended = true,
         ),
         ModelOption(
-            id = "gpt-4o-mini",
-            name = "GPT-4o Mini",
+            id = "gpt-4.1-mini",
+            name = "GPT-4.1 mini",
             provider = "OpenAI",
-            description = "Balanced speed & accuracy",
+            description = "Fast multimodal classification",
+            supportsImages = true,
         ),
         ModelOption(
-            id = "gpt-4o",
-            name = "GPT-4o",
-            provider = "OpenAI",
-            description = "Most accurate, higher cost",
+            id = "grok-2-vision-latest",
+            name = "Grok 2 Vision",
+            provider = "Grok (xAI)",
+            description = "Vision-capable Grok model",
+            supportsImages = true,
         ),
         ModelOption(
-            id = "claude-3.5-sonnet",
-            name = "Claude 3.5 Sonnet",
-            provider = "Anthropic",
-            description = "Strong reasoning, detailed analysis",
-        ),
-    )
-
-    val results = listOf(
-        ScanResultUi(
-            productName = "Strawberry Fruit Snacks",
-            novaGroup = 4,
-            summary = "This stubbed scan is flagged as ultra-processed because it includes multiple industrial additives and syrup-based sweeteners.",
-            problemIngredients = listOf(
-                ProblemIngredient("High Fructose Corn Syrup", "Industrial sweetener often seen in ultra-processed products."),
-                ProblemIngredient("Red 40", "Synthetic food dye used for color standardization."),
-                ProblemIngredient("TBHQ", "Synthetic preservative used to extend shelf life."),
-            ),
-            allIngredients = listOf(
-                "Sugar",
-                "High Fructose Corn Syrup",
-                "Modified Corn Starch",
-                "Citric Acid",
-                "Natural Flavor",
-                "Red 40",
-                "TBHQ",
-                "Gelatin",
-            ),
-            engineLabel = "Rules + demo stub",
-            confidence = 0.88f,
-        ),
-        ScanResultUi(
-            productName = "Whole Grain Cereal Bar",
-            novaGroup = 3,
-            summary = "This stubbed result is moderately processed. It contains recognizable grains, but also added sugar and emulsifiers.",
-            problemIngredients = listOf(
-                ProblemIngredient("Cane Sugar", "Added sugar increases processing and energy density."),
-                ProblemIngredient("Soy Lecithin", "Emulsifier that usually indicates a more processed formulation."),
-            ),
-            allIngredients = listOf(
-                "Whole Grain Oats",
-                "Brown Rice Syrup",
-                "Cane Sugar",
-                "Soy Lecithin",
-                "Sea Salt",
-                "Natural Flavor",
-            ),
-            engineLabel = "Rules + demo stub",
-            confidence = 0.6f,
-        ),
-        ScanResultUi(
-            productName = "Organic Mixed Nuts",
-            novaGroup = 1,
-            summary = "This stubbed result looks minimally processed. The ingredient list is short and made of whole foods.",
-            problemIngredients = emptyList(),
-            allIngredients = listOf("Almonds", "Cashews", "Walnuts", "Pecans", "Sea Salt"),
-            engineLabel = "Rules fallback stub",
-            confidence = 0.62f,
-        ),
-    )
-
-    fun initialHistory(): List<HistoryItemUi> = listOf(
-        HistoryItemUi(
-            id = "history-1",
-            productName = "Strawberry Fruit Snacks",
-            novaGroup = 4,
-            scannedAt = "2 min ago",
-            summary = "Flagged for multiple additives and synthetic dye markers.",
-        ),
-        HistoryItemUi(
-            id = "history-2",
-            productName = "Organic Mixed Nuts",
-            novaGroup = 1,
-            scannedAt = "15 min ago",
-            summary = "Short ingredient list with whole-food composition.",
-        ),
-        HistoryItemUi(
-            id = "history-3",
-            productName = "Whole Grain Cereal Bar",
-            novaGroup = 3,
-            scannedAt = "1 hr ago",
-            summary = "Processed, but less severe than an industrial snack.",
-        ),
-        HistoryItemUi(
-            id = "history-4",
-            productName = "Diet Cola Zero",
-            novaGroup = 4,
-            scannedAt = "1 hr ago",
-            summary = "Artificial sweeteners and flavor system triggered a high-processing warning.",
-        ),
-        HistoryItemUi(
-            id = "history-5",
-            productName = "Fresh Orange Juice",
-            novaGroup = 1,
-            scannedAt = "2 hrs ago",
-            summary = "Closer to minimally processed based on the simple ingredient profile.",
-        ),
-        HistoryItemUi(
-            id = "history-6",
-            productName = "Protein Energy Bar",
-            novaGroup = 3,
-            scannedAt = "3 hrs ago",
-            summary = "Moderately processed with sweeteners and texture agents.",
+            id = "llama-3.1-8b-instant",
+            name = "Llama 3.1 8B Instant",
+            provider = "Groq",
+            description = "Fast text inference via Groq",
+            supportsImages = false,
         ),
     )
 }

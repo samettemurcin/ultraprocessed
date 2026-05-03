@@ -1,5 +1,6 @@
 package com.b2.ultraprocessed.ui
 
+import com.b2.ultraprocessed.analysis.AnalysisStage
 import com.b2.ultraprocessed.analysis.FoodAnalysisPipeline
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -30,6 +31,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -46,19 +48,16 @@ import com.b2.ultraprocessed.ui.theme.Emerald400
 import com.b2.ultraprocessed.ui.theme.Emerald500
 import com.b2.ultraprocessed.ui.theme.Emerald600
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
-import kotlinx.coroutines.launch
 
 private data class Step(val text: String, val tag: String)
 
 enum class AnalysisMode {
-    /** Photo of ingredient label → OCR → normalize → classify (same downstream as barcode). */
+    /** Photo of ingredient label → staged LLM workflow, with OCR/rules fallback. */
     LabelImage,
     /** Photo still → read barcode from image → USDA → classify. */
     BarcodeImage,
-    /** Live (or stub) barcode value → USDA → normalize → classify — parallel entry to OCR path. */
+    /** Live or test-provided barcode value → USDA → normalize → classify. */
     BarcodeValue,
-    DemoAsset,
 }
 
 private fun analysisSteps(
@@ -66,40 +65,36 @@ private fun analysisSteps(
     mode: AnalysisMode,
 ) = listOf(
     Step(
-        when {
-            mode == AnalysisMode.BarcodeImage -> "Reading barcode image…"
-            mode == AnalysisMode.BarcodeValue -> "Barcode captured…"
-            mode == AnalysisMode.DemoAsset -> "Loading sample image…"
-            else -> "Reading label image…"
+        when (mode) {
+            AnalysisMode.BarcodeImage -> "Analysing Image"
+            AnalysisMode.BarcodeValue -> "Analysing Barcode"
+            AnalysisMode.LabelImage -> "Analysing Image"
         },
         when (mode) {
             AnalysisMode.BarcodeImage -> "Barcode"
-            AnalysisMode.BarcodeValue -> "ML Kit"
-            AnalysisMode.DemoAsset -> "Demo"
-            AnalysisMode.LabelImage -> "ML Kit"
+            AnalysisMode.BarcodeValue -> "USDA"
+            AnalysisMode.LabelImage -> modelName
         },
     ),
     Step(
         text = when (mode) {
-            AnalysisMode.BarcodeImage, AnalysisMode.BarcodeValue -> "Looking up USDA product data…"
-            else -> "Extracting ingredient text…"
+            AnalysisMode.BarcodeImage, AnalysisMode.BarcodeValue -> "Extracting Ingredients"
+            AnalysisMode.LabelImage -> "Extracting Ingredients"
         },
-        tag = if (mode == AnalysisMode.LabelImage || mode == AnalysisMode.DemoAsset) "OCR" else "USDA",
+        tag = if (mode == AnalysisMode.LabelImage) modelName else "USDA",
     ),
     Step(
         text = when (mode) {
-            AnalysisMode.BarcodeImage -> "Extracting fallback OCR text if needed…"
-            AnalysisMode.BarcodeValue -> "Loading ingredient list from USDA…"
-            else -> "Normalizing ingredient text…"
+            AnalysisMode.BarcodeImage, AnalysisMode.BarcodeValue -> "Analysing Ingredients"
+            AnalysisMode.LabelImage -> "Analysing Ingredients"
         },
         tag = when (mode) {
-            AnalysisMode.BarcodeImage -> "OCR"
+            AnalysisMode.BarcodeImage -> "USDA/Image"
             AnalysisMode.BarcodeValue -> "USDA"
-            else -> "Normalize"
+            else -> modelName
         },
     ),
-    Step("Running NOVA-style rules…", "Rules"),
-    Step("Preparing verdict…", modelName),
+    Step("Completed", "Result"),
 )
 
 @Composable
@@ -107,9 +102,9 @@ fun AnalyzingScreen(
     scanSessionId: Int,
     imagePath: String?,
     barcodeValue: String?,
-    demoAssetPath: String?,
     mode: AnalysisMode,
-    minimumDisplayMillis: Long = 2600L,
+    minimumDisplayMillis: Long = 0L,
+    modelId: String,
     modelName: String,
     onSuccess: (ScanResultUi) -> Unit,
     onFailure: (String) -> Unit,
@@ -121,48 +116,43 @@ fun AnalyzingScreen(
     }
     var currentStep by remember { mutableIntStateOf(0) }
     var progress by remember { mutableFloatStateOf(0f) }
+    var statusMessage by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(scanSessionId) {
-        val stepJob = launch {
-            while (isActive) {
-                delay(450)
-                currentStep = (currentStep + 1).coerceAtMost(steps.lastIndex)
-            }
-        }
-        val progressJob = launch {
-            while (isActive && progress < 92f) {
-                delay(50)
-                progress += 1.8f
-            }
-        }
-
+        statusMessage = null
         val startAt = System.currentTimeMillis()
         val outcome = runCatching {
+            val onStage: (AnalysisStage) -> Unit = { stage ->
+                currentStep = stage.stepIndex()
+                progress = stage.progressPercent()
+            }
+            val onStatus: (String) -> Unit = { message ->
+                statusMessage = message
+            }
             when {
-                mode == AnalysisMode.DemoAsset && demoAssetPath != null ->
-                    pipeline.analyzeFromDemoAsset(context, demoAssetPath).getOrThrow().scanResult
                 mode == AnalysisMode.BarcodeValue && !barcodeValue.isNullOrBlank() ->
                     pipeline.analyzeFromBarcode(
                         barcodeCode = barcodeValue.trim(),
                         sourceImagePath = null,
+                        modelId = modelId,
+                        onStage = onStage,
+                        onStatus = onStatus,
                     ).getOrThrow().scanResult
                 mode == AnalysisMode.BarcodeImage && imagePath != null ->
-                    pipeline.analyzeFromBarcodeImage(imagePath).getOrThrow().scanResult
+                    pipeline.analyzeFromBarcodeImage(imagePath, modelId, onStage, onStatus).getOrThrow().scanResult
                 mode == AnalysisMode.LabelImage && imagePath != null ->
-                    pipeline.analyzeFromImage(imagePath).getOrThrow().scanResult
+                    pipeline.analyzeFromImage(imagePath, modelId, onStage, onStatus).getOrThrow().scanResult
                 else ->
                     throw IllegalStateException("No scan input.")
             }
         }
 
         val elapsed = System.currentTimeMillis() - startAt
-        val remaining = minimumDisplayMillis - elapsed
+        val remaining = minimumDisplayMillis.coerceAtLeast(0L) - elapsed
         if (remaining > 0) {
             delay(remaining)
         }
 
-        stepJob.cancel()
-        progressJob.cancel()
         progress = 100f
         currentStep = steps.lastIndex
 
@@ -299,6 +289,17 @@ fun AnalyzingScreen(
                 fontWeight = FontWeight.SemiBold,
             )
 
+            if (!statusMessage.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = statusMessage.orEmpty(),
+                    color = Color.White.copy(alpha = 0.32f),
+                    fontSize = 11.sp,
+                    lineHeight = 15.sp,
+                    modifier = Modifier.padding(horizontal = 10.dp),
+                )
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             Surface(
@@ -337,3 +338,19 @@ fun AnalyzingScreen(
         )
     }
 }
+
+private fun AnalysisStage.stepIndex(): Int =
+    when (this) {
+        AnalysisStage.AnalysingImage -> 0
+        AnalysisStage.ExtractingIngredients -> 1
+        AnalysisStage.AnalysingIngredients -> 2
+        AnalysisStage.Completed -> 3
+    }
+
+private fun AnalysisStage.progressPercent(): Float =
+    when (this) {
+        AnalysisStage.AnalysingImage -> 8f
+        AnalysisStage.ExtractingIngredients -> 35f
+        AnalysisStage.AnalysingIngredients -> 72f
+        AnalysisStage.Completed -> 100f
+    }

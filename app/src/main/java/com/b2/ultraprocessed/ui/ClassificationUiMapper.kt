@@ -1,6 +1,7 @@
 package com.b2.ultraprocessed.ui
 
 import com.b2.ultraprocessed.classify.ClassificationResult
+import com.b2.ultraprocessed.classify.IngredientAssessment
 
 object ClassificationUiMapper {
     fun toScanResultUi(
@@ -12,6 +13,9 @@ object ClassificationUiMapper {
         labelImagePath: String? = null,
         scannedBarcode: String? = null,
         brandOwner: String? = null,
+        allergens: List<String> = emptyList(),
+        rawIngredientText: String = normalizedIngredientLine,
+        usageEstimate: UsageEstimateUi? = null,
     ): ScanResultUi {
         val productName = productNameOverride?.takeIf { it.isNotBlank() }
             ?: deriveProductTitle(normalizedIngredientLine)
@@ -27,17 +31,14 @@ object ClassificationUiMapper {
                 reason = if (isPackagingCue) {
                     "Matched a front-of-box or reheating line OCR often reads instead of the ingredient panel."
                 } else {
-                    "Detected in the ingredient text; counted toward the rules-based NOVA-style score."
+                    "Flagged by the API analysis as a stronger NOVA signal."
                 },
             )
         }
 
         val allIngredients = splitIngredientList(normalizedIngredientLine)
-
-        val engineLabel = when (classification.engine) {
-            "rules" -> "Rules engine (on-device)"
-            else -> classification.engine
-        }
+        val ingredientAssessments = classification.ingredientAssessments.map { it.toUiAssessment() }
+        val engineLabel = classification.engine
 
         return ScanResultUi(
             productName = productName,
@@ -49,9 +50,13 @@ object ClassificationUiMapper {
             confidence = classification.confidence,
             sourceLabel = sourceLabel,
             warnings = warnings,
+            allergens = allergens,
+            ingredientAssessments = ingredientAssessments,
+            rawIngredientText = rawIngredientText,
             labelImagePath = labelImagePath,
             scannedBarcode = scannedBarcode,
             brandOwner = brandOwner,
+            usageEstimate = usageEstimate,
         )
     }
 
@@ -68,6 +73,13 @@ object ClassificationUiMapper {
         normalized.split(',', ';')
             .map { it.trim() }
             .filter { it.isNotEmpty() }
+
+    private fun IngredientAssessment.toUiAssessment(): IngredientBubbleUi =
+        IngredientBubbleUi(
+            name = name,
+            novaGroup = novaGroup.coerceIn(1, 4),
+            reason = reason,
+        )
 
     private fun titleCasePhrase(phrase: String): String =
         phrase.split(' ')

@@ -1,0 +1,161 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "99e1a2860758b972f28a77bddb8a3fcf",
+    "entities": [
+      {
+        "tableName": "scan_results",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `productName` TEXT NOT NULL DEFAULT 'Scanned label', `novaGroup` INTEGER NOT NULL DEFAULT 0, `ocrText` TEXT NOT NULL, `cleanedIngredients` TEXT NOT NULL, `verdict` TEXT NOT NULL, `confidenceScore` REAL NOT NULL, `detectedMarkers` TEXT NOT NULL, `allergens` TEXT NOT NULL DEFAULT '', `explanation` TEXT NOT NULL, `engineUsed` TEXT NOT NULL, `modelId` TEXT NOT NULL DEFAULT '', `modelName` TEXT NOT NULL DEFAULT '', `provider` TEXT NOT NULL DEFAULT '', `estimatedInputTokens` INTEGER NOT NULL DEFAULT 0, `estimatedOutputTokens` INTEGER NOT NULL DEFAULT 0, `estimatedTotalTokens` INTEGER NOT NULL DEFAULT 0, `estimatedCostUsd` REAL NOT NULL DEFAULT 0.0, `capturedImagePath` TEXT, `isBarcodeLookupOnly` INTEGER NOT NULL DEFAULT 0, `scannedAt` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "productName",
+            "columnName": "productName",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "'Scanned label'"
+          },
+          {
+            "fieldPath": "novaGroup",
+            "columnName": "novaGroup",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "ocrText",
+            "columnName": "ocrText",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cleanedIngredients",
+            "columnName": "cleanedIngredients",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "verdict",
+            "columnName": "verdict",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "confidenceScore",
+            "columnName": "confidenceScore",
+            "affinity": "REAL",
+            "notNull": true
+          },
+          {
+            "fieldPath": "detectedMarkers",
+            "columnName": "detectedMarkers",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "allergens",
+            "columnName": "allergens",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "explanation",
+            "columnName": "explanation",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "engineUsed",
+            "columnName": "engineUsed",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "modelId",
+            "columnName": "modelId",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "modelName",
+            "columnName": "modelName",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "provider",
+            "columnName": "provider",
+            "affinity": "TEXT",
+            "notNull": true,
+            "defaultValue": "''"
+          },
+          {
+            "fieldPath": "estimatedInputTokens",
+            "columnName": "estimatedInputTokens",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "estimatedOutputTokens",
+            "columnName": "estimatedOutputTokens",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "estimatedTotalTokens",
+            "columnName": "estimatedTotalTokens",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "estimatedCostUsd",
+            "columnName": "estimatedCostUsd",
+            "affinity": "REAL",
+            "notNull": true,
+            "defaultValue": "0.0"
+          },
+          {
+            "fieldPath": "capturedImagePath",
+            "columnName": "capturedImagePath",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "isBarcodeLookupOnly",
+            "columnName": "isBarcodeLookupOnly",
+            "affinity": "INTEGER",
+            "notNull": true,
+            "defaultValue": "0"
+          },
+          {
+            "fieldPath": "scannedAt",
+            "columnName": "scannedAt",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        }
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '99e1a2860758b972f28a77bddb8a3fcf')"
+    ]
+  }
+}

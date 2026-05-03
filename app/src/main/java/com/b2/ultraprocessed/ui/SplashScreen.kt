@@ -38,7 +38,7 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun SplashScreen(
-    displayDurationMillis: Long = 4200L,
+    displayDurationMillis: Long = 0L,
     onComplete: () -> Unit,
 ) {
     val pulse = rememberInfiniteTransition(label = "pulse")
@@ -53,7 +53,7 @@ fun SplashScreen(
     )
 
     LaunchedEffect(Unit) {
-        delay(displayDurationMillis)
+        delay(displayDurationMillis.coerceAtLeast(0L))
         onComplete()
     }
 
