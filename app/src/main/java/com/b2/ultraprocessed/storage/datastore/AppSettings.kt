@@ -1,4 +1,4 @@
-package com.b2.ultraprocessed.storage.secrets
+package com.b2.ultraprocessed.storage.datastore
 
 import android.content.Context
 import androidx.datastore.core.DataStore

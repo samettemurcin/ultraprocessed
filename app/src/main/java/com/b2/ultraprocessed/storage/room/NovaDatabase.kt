@@ -1,4 +1,4 @@
-package com.b2.ultraprocessed.storage.secrets
+package com.b2.ultraprocessed.storage.room
 
 import android.content.Context
 import androidx.room.Database
