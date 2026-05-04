@@ -39,6 +39,19 @@ class FoodLabelPromptContractTest {
         assertTrue(prompt.contains("OCR / Noisy Input Note", ignoreCase = true))
         assertTrue(prompt.contains("do not guess from product name", ignoreCase = true))
         assertTrue(prompt.contains("Do not infer from shared-facility claims", ignoreCase = true))
+        assertTrue(prompt.contains("standalone allergen name", ignoreCase = true))
+        assertTrue(prompt.contains("Contains: Wheat, May Contain Milk", ignoreCase = true))
+    }
+
+    @Test
+    fun validationPrompt_repairsSentenceLikeLabels() {
+        val prompt = promptText("food_label_response_validation_prompt.md")
+
+        assertTrue(prompt.contains("ingredient extraction", ignoreCase = true))
+        assertTrue(prompt.contains("classification", ignoreCase = true))
+        assertTrue(prompt.contains("allergen detection", ignoreCase = true))
+        assertTrue(prompt.contains("sentence-like ingredient text or allergen text", ignoreCase = true))
+        assertTrue(prompt.contains("Contains: Wheat, May Contain Milk", ignoreCase = true))
     }
 
     @Test

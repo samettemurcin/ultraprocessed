@@ -13,3 +13,12 @@ val White40 = Color(0x66FFFFFF)
 val White20 = Color(0x33FFFFFF)
 val White10 = Color(0x1AFFFFFF)
 val White05 = Color(0x0DFFFFFF)
+
+// Semantic palette — NOVA verdicts, allergens, error states
+val SkyBlue300 = Color(0xFF7DD3FC)
+val SkyBlue400 = Color(0xFF38BDF8)
+val Green400 = Color(0xFF4ADE80)
+val Green500 = Color(0xFF22C55E)
+val Orange400 = Color(0xFFFB923C)
+val Red400 = Color(0xFFF87171)
+val Red500 = Color(0xFFEF4444)

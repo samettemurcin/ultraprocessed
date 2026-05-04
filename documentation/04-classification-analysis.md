@@ -7,13 +7,17 @@ This layer turns extracted ingredient evidence into the final result model shown
 - `analysis/FoodAnalysisPipeline.kt`
 - `analysis/AnalysisReport.kt`
 - `analysis/AnalysisStage.kt`
+- `analysis/UsageEstimateCalculator.kt`
 - `network/llm/FoodLabelLlmWorkflow.kt`
 - `network/llm/GeminiFoodLabelLlmWorkflow.kt`
 - `network/llm/OpenAiCompatibleFoodLabelLlmWorkflow.kt`
 - `network/llm/LlmContractRetry.kt`
+- `network/llm/ResultChatWorkflow.kt`
 - `assets/prompts/food_label_ingredient_extraction_prompt.md`
 - `assets/prompts/food_label_classification_prompt.md`
 - `assets/prompts/food_label_allergen_prompt.md`
+- `assets/prompts/food_label_response_validation_prompt.md`
+- `assets/prompts/food_label_result_chat_prompt.md`
 - `ui/ClassificationUiMapper.kt`
 
 ## Pipeline Overview
@@ -27,6 +31,8 @@ flowchart TB
     Gate -->|No| Allergen[Allergen detection]
     Classify --> Result[AnalysisReport]
     Allergen --> Result
+    Result --> Usage[Usage estimate]
+    Usage --> Ui
     Result --> Ui[ScanResultUi]
 ```
 
@@ -149,6 +155,10 @@ classDiagram
 - Retry prompts include the previous schema error.
 - Retry delays increase between attempts.
 - UI status text surfaces the retry timing instead of hiding it.
+- The workflow also includes a validation pass for the raw model response when the output needs normalization.
+- If retries are exhausted, the pipeline converts the error into a user-safe message rather than exposing raw schema names.
+
+For the full API request/response contract, see [08-llm-api-contracts.md](08-llm-api-contracts.md).
 
 ## Result Mapping
 
@@ -158,6 +168,20 @@ classDiagram
 - `ingredientAssessments` becomes the ingredient chip list.
 - `allergens` becomes a separate allergen block.
 - `warnings` becomes the data warning block at the bottom.
+- `UsageEstimateCalculator` estimates input tokens, output tokens, total tokens, and cost for history summaries.
+
+## Usage And Cost Metadata
+
+History currently displays app-estimated usage values. The estimate is useful for product feedback and local tracking, but it is not exact billing telemetry unless a provider workflow is extended to return provider usage metadata.
+
+```mermaid
+flowchart LR
+    Prompt[Prompt + ingredient evidence] --> Estimator[UsageEstimateCalculator]
+    Estimator --> Tokens[Estimated tokens]
+    Estimator --> Cost[Estimated cost]
+    Tokens --> Room[Room history]
+    Cost --> Room
+```
 
 ## Operational Notes
 

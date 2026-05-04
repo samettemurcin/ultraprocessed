@@ -116,21 +116,23 @@ class GeminiResultChatWorkflow(
         modelId: String,
         onStatus: (String) -> Unit,
     ): Result<ResultChatReply> = withContext(Dispatchers.IO) {
-        runCatching {
+        try {
             require(modelId.startsWith("gemini-")) {
                 "Selected model is not supported for result chat."
             }
             val sanitizedQuestion = sanitizeQuestion(question)
             if (looksLikeInjectionAttempt(sanitizedQuestion)) {
-                return@runCatching ResultChatReply(
-                    allowed = false,
-                    answer = "I can only answer questions about this scan result.",
-                    reason = "Prompt injection attempt detected.",
+                return@withContext Result.success(
+                    ResultChatReply(
+                        allowed = false,
+                        answer = "I can only answer questions about this scan result.",
+                        reason = "Prompt injection attempt detected.",
+                    ),
                 )
             }
             val prompt = readPrompt(RESULT_CHAT_PROMPT)
             val contextJson = result.toChatContextJson().toString(2)
-            retryContractParse(
+            val reply = retryContractParse(
                 operationLabel = "result chat",
                 onStatus = onStatus,
                 buildPrompt = { attempt, previousError ->
@@ -150,6 +152,9 @@ class GeminiResultChatWorkflow(
                 },
                 parse = ::parseReply,
             )
+            Result.success(reply)
+        } catch (t: Throwable) {
+            Result.failure(t)
         }
     }
 
@@ -285,18 +290,20 @@ class OpenAiCompatibleResultChatWorkflow(
         modelId: String,
         onStatus: (String) -> Unit,
     ): Result<ResultChatReply> = withContext(Dispatchers.IO) {
-        runCatching {
+        try {
             val sanitizedQuestion = sanitizeQuestion(question)
             if (looksLikeInjectionAttempt(sanitizedQuestion)) {
-                return@runCatching ResultChatReply(
-                    allowed = false,
-                    answer = "I can only answer questions about this scan result.",
-                    reason = "Prompt injection attempt detected.",
+                return@withContext Result.success(
+                    ResultChatReply(
+                        allowed = false,
+                        answer = "I can only answer questions about this scan result.",
+                        reason = "Prompt injection attempt detected.",
+                    ),
                 )
             }
             val prompt = readPrompt(RESULT_CHAT_PROMPT)
             val contextJson = result.toChatContextJson().toString(2)
-            retryContractParse(
+            val reply = retryContractParse(
                 operationLabel = "result chat",
                 onStatus = onStatus,
                 buildPrompt = { attempt, previousError ->
@@ -317,6 +324,9 @@ class OpenAiCompatibleResultChatWorkflow(
                 },
                 parse = ::parseReply,
             )
+            Result.success(reply)
+        } catch (t: Throwable) {
+            Result.failure(t)
         }
     }
 

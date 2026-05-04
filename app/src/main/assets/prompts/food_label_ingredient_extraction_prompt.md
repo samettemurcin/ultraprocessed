@@ -26,6 +26,7 @@ Think like a careful systems engineer:
 8. Return exactly one JSON object. No markdown. No prose. No code fences.
 9. Break comma-separated, semicolon-separated, and clearly delimited ingredient strings into short atomic items. Do not return long clause-like items in the `ingredients` array.
 10. Keep each `ingredients` entry compact and readable. The UI renders each item as a bubble, so prefer one ingredient component per array item.
+11. Do not place advisory claims, warning phrases, or sentence fragments such as `Contains: Wheat` or `May contain milk` into the `ingredients` array. Those are not ingredients.
 
 ## Output Schema
 

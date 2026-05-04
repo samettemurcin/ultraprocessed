@@ -29,9 +29,9 @@ class UltraProcessedAppIntegrationTest {
         }
 
         composeRule.waitUntil(timeoutMillis = 5_000) {
-            composeRule.onAllNodesWithText("Live scanner").fetchSemanticsNodes().isNotEmpty()
+            composeRule.onAllNodesWithText("Zest").fetchSemanticsNodes().isNotEmpty()
         }
-        composeRule.onNodeWithText("Live scanner").assertIsDisplayed()
+        composeRule.onNodeWithText("Zest").assertIsDisplayed()
         composeRule.onNodeWithTag(AppTestTags.SCANNER_CAPTURE_BUTTON).assertIsDisplayed()
         composeRule.onNodeWithTag(AppTestTags.SCANNER_UPLOAD_BUTTON).assertIsDisplayed()
     }

@@ -11,20 +11,21 @@ plugins {
 fun String.asBuildConfigStringLiteral(): String =
     "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-fun readLocalProperty(name: String): String {
-    val propertiesFile = rootProject.file("local.properties")
-    if (!propertiesFile.exists()) return ""
-    val properties = Properties()
-    propertiesFile.inputStream().use { properties.load(it) }
-    return properties.getProperty(name).orEmpty().trim()
-}
-
 val releaseVersionCode = providers.gradleProperty("ZEST_VERSION_CODE")
     .map(String::toInt)
     .orElse(1)
 val releaseVersionName = providers.gradleProperty("ZEST_VERSION_NAME")
     .orElse("1.0.0")
-val usdaBootstrapApiKeyB64 = readLocalProperty("ZEST_USDA_BOOTSTRAP_API_KEY_B64")
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.layout.projectDirectory.file("local.properties").asFile
+    if (localPropertiesFile.isFile) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+val usdaBootstrapApiKeyB64 = localProperties
+    .getProperty("ZEST_USDA_BOOTSTRAP_API_KEY_B64")
+    .orEmpty()
+    .trim()
 val releaseStoreFile = providers.environmentVariable("ZEST_RELEASE_STORE_FILE").orNull
 val releaseStorePassword = providers.environmentVariable("ZEST_RELEASE_STORE_PASSWORD").orNull
 val releaseKeyAlias = providers.environmentVariable("ZEST_RELEASE_KEY_ALIAS").orNull
@@ -106,24 +107,104 @@ kotlin {
     }
 }
 
-gradle.taskGraph.whenReady {
-    val releaseArtifactTaskRequested = allTasks.any { task ->
-        task.path == ":app:assembleRelease" ||
-            task.path == ":app:bundleRelease" ||
-            task.path == ":app:packageRelease"
-    }
-    if (releaseArtifactTaskRequested && !hasReleaseSigning) {
-        throw GradleException(
-            "Release signing is required. Set ZEST_RELEASE_STORE_FILE, " +
-                "ZEST_RELEASE_STORE_PASSWORD, ZEST_RELEASE_KEY_ALIAS, and " +
-                "ZEST_RELEASE_KEY_PASSWORD before producing release artifacts."
-        )
+val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
+    group = "verification"
+    description = "Fails release artifact generation if signing material is missing."
+    doLast {
+        if (!hasReleaseSigning) {
+            throw GradleException(
+                "Release signing is required. Set ZEST_RELEASE_STORE_FILE, " +
+                    "ZEST_RELEASE_STORE_PASSWORD, ZEST_RELEASE_KEY_ALIAS, and " +
+                    "ZEST_RELEASE_KEY_PASSWORD before producing release artifacts."
+            )
+        }
     }
 }
 
+val retiredSourcePaths = listOf(
+    "src/main/java/com/b2/ultraprocessed/ui/DemoImageSamples.kt",
+    "src/main/java/com/b2/ultraprocessed/ui/DemoSamplePickerDialog.kt",
+    "src/main/java/com/b2/ultraprocessed/classify/RulesClassifier.kt",
+    "src/main/java/com/b2/ultraprocessed/classify/OnDeviceLLMClassifier.kt",
+    "src/test/java/com/b2/ultraprocessed/classify/ClassifierOrchestratorTest.kt",
+    "src/test/java/com/b2/ultraprocessed/classify/RulesClassifierTest.kt",
+    "src/test/java/com/b2/ultraprocessed/classify/NovaIngredientSampleFixturesTest.kt",
+)
+
+val verifyNoRetiredSourceFiles = tasks.register("verifyNoRetiredSourceFiles") {
+    group = "verification"
+    description = "Fails before Kotlin/KSP if retired demo or legacy source files reappear."
+    doLast {
+        val existing = retiredSourcePaths
+            .map { layout.projectDirectory.file(it).asFile }
+            .filter { it.exists() }
+
+        if (existing.isNotEmpty()) {
+            throw GradleException(
+                "Retired source files reappeared and must not ship or enter KSP:\n" +
+                    existing.joinToString(separator = "\n") { " - ${it.relativeTo(projectDir)}" } +
+                    "\nDelete these files; they are intentionally ignored in .gitignore."
+            )
+        }
+    }
+}
+
+val verifyNoDatalessSources = tasks.register("verifyNoDatalessSources") {
+    group = "verification"
+    description = "Fails before Kotlin/KSP if macOS dataless placeholders exist under app/src."
+    doLast {
+        if (!System.getProperty("os.name").contains("Mac", ignoreCase = true)) {
+            return@doLast
+        }
+
+        val appSrc = layout.projectDirectory.dir("src").asFile
+        val process = ProcessBuilder(
+            "/usr/bin/find",
+            appSrc.absolutePath,
+            "-flags",
+            "+dataless",
+            "-print",
+        )
+            .redirectErrorStream(true)
+            .start()
+        val datalessFiles = process.inputStream.bufferedReader().use { it.readText() }.trim()
+        val exitCode = process.waitFor()
+
+        if (exitCode != 0) {
+            throw GradleException("Unable to check for macOS dataless placeholders under app/src.")
+        }
+
+        if (datalessFiles.isNotEmpty()) {
+            throw GradleException(
+                "macOS dataless source placeholders detected under app/src. " +
+                    "These can make Gradle/KSP hang while hashing sources:\n$datalessFiles\n" +
+                    "Hydrate or delete the listed files before building."
+            )
+        }
+    }
+}
+
+val verifySourceTreeForBuild = tasks.register("verifySourceTreeForBuild") {
+    group = "verification"
+    description = "Guards the Android source tree from retired files and macOS dataless placeholders."
+    dependsOn(verifyNoRetiredSourceFiles, verifyNoDatalessSources)
+}
+
+tasks.named("preBuild") {
+    dependsOn(verifySourceTreeForBuild)
+}
+
+tasks.matching {
+    it.path == ":app:assembleRelease" ||
+        it.path == ":app:bundleRelease" ||
+        it.path == ":app:packageRelease"
+}.configureEach {
+    dependsOn(verifyReleaseSigning)
+}
+
 ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
     arg("room.incremental", "true")
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {

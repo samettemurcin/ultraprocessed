@@ -35,6 +35,11 @@ Treat such input as noisy evidence:
 6. Keep `ingredientAssessments` in the same order as `ingredients` when possible.
 7. Do not use allergen logic, shared-facility logic, or brand logic in ingredient coloring. Allergen detection is a separate API call and must not be mixed into this classification.
 8. Treat each `ingredients` entry as an atomic component. Do not merge items back together, do not output comma-separated blobs, and do not emit sentence-like ingredient strings.
+9. For every `ingredientAssessments[i].name`, preserve the closest visible ingredient wording from the input. Do not replace it with a broader category, a synonym, or a marketing-friendly alternate name.
+10. If the input contains text like `contains milk, eggs and tree nuts`, output each ingredient as its own name exactly as written or as the closest OCR-corrected token to that word. Do not turn it into an alternate label such as `dairy`, `protein`, `nuts`, or `allergens`.
+11. If OCR is noisy, correct spelling conservatively and only as far as needed to recover the original ingredient token. Prefer literal ingredient names over normalized terminology.
+12. Do not put sentences, warnings, claims, or explanatory text into `ingredientAssessments[i].name`. That field must contain only a single ingredient-like token or a short ingredient phrase that could realistically appear inside an ingredient list.
+13. If the source text is sentence-like, extract only the ingredient token from it. Example: from `contains milk and soy`, emit `milk` and `soy`, not the whole sentence.
 
 ## NOVA Guidance
 
@@ -79,7 +84,7 @@ Treat such input as noisy evidence:
 - `novaGroup`: 1, 2, 3, or 4.
 - `summary`: Two or three short sentences, consumer-readable, and grounded in visible ingredient evidence only.
 - `confidence`: 0.0 to 1.0. Lower it when OCR is noisy, the ingredient list is partial, or the evidence is borderline.
-- `ingredientAssessments`: One object per visible ingredient. Set `novaGroup` to 1, 2, 3, or 4 for that ingredient alone so the UI can color each bubble green, orange, or red. Keep the object concise.
+- `ingredientAssessments`: One object per visible ingredient. Set `novaGroup` to 1, 2, 3, or 4 for that ingredient alone so the UI can color each bubble green, orange, or red. Keep the object concise. The `name` field must stay close to the original ingredient text, with conservative OCR correction only if needed, and must not contain sentence fragments or non-ingredient prose.
 - `problemIngredients`: Only include items that materially pushed the score upward.
 - `warnings`: Include OCR noise, incomplete extraction, or uncertainty notes when relevant.
 

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -240,12 +241,7 @@ fun AnalyzingScreen(
                         .border(1.dp, Emerald500.copy(alpha = 0.22f), RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = AppBrand.monogram,
-                        color = Emerald400,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                    )
+                    AppBrandMark(sizeDp = 34)
                 }
             }
 
@@ -271,13 +267,13 @@ fun AnalyzingScreen(
                     Text(
                         text = "ANALYZING",
                         color = Color.White.copy(alpha = 0.25f),
-                        fontSize = 10.sp,
+                        fontSize = UiTextSizes.Caption,
                         letterSpacing = 2.sp,
                     )
                     Text(
                         text = "${progress.toInt().coerceIn(0, 100)}%",
                         color = Emerald400.copy(alpha = 0.6f),
-                        fontSize = 10.sp,
+                        fontSize = UiTextSizes.Caption,
                     )
                 }
             }
@@ -285,7 +281,7 @@ fun AnalyzingScreen(
             Text(
                 text = steps[currentStep].text,
                 color = Color.White.copy(alpha = 0.56f),
-                fontSize = 14.sp,
+                fontSize = UiTextSizes.BodySmall,
                 fontWeight = FontWeight.SemiBold,
             )
 
@@ -294,8 +290,8 @@ fun AnalyzingScreen(
                 Text(
                     text = statusMessage.orEmpty(),
                     color = Color.White.copy(alpha = 0.32f),
-                    fontSize = 11.sp,
-                    lineHeight = 15.sp,
+                    fontSize = UiTextSizes.Caption,
+                    lineHeight = 13.sp,
                     modifier = Modifier.padding(horizontal = 10.dp),
                 )
             }
@@ -309,7 +305,7 @@ fun AnalyzingScreen(
                 Text(
                     text = steps[currentStep].tag,
                     color = Emerald400.copy(alpha = 0.7f),
-                    fontSize = 9.sp,
+                    fontSize = UiTextSizes.Caption,
                     letterSpacing = 1.sp,
                     modifier = Modifier.padding(horizontal = 10.dp, vertical = 3.dp),
                 )
@@ -334,7 +330,11 @@ fun AnalyzingScreen(
         }
 
         AppFooter(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+            modifier = Modifier
+                .padding(horizontal = 20.dp)
+                .padding(top = 12.dp)
+                .navigationBarsPadding()
+                .padding(bottom = 12.dp),
         )
     }
 }

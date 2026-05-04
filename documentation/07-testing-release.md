@@ -6,9 +6,23 @@ The release bar is:
 
 - no rule-based classification path in runtime,
 - no demo/sample UI paths in production,
+- no retired or macOS dataless source files entering KSP,
 - API contracts enforced by tests,
 - release minification passing,
 - and user-facing 429 handling present in the UI.
+
+## Fast Local Verification
+
+Run this after most code changes:
+
+```bash
+./gradlew :app:verifySourceTreeForBuild :app:compileDebugKotlin
+```
+
+`verifySourceTreeForBuild` runs before Android `preBuild` and blocks two known release risks:
+
+- retired demo, sample, or rule-based classifier files reappearing,
+- macOS dataless placeholders under `app/src` that can make Gradle or KSP appear stuck.
 
 ## Unit Tests
 
@@ -58,6 +72,7 @@ Release hardening:
 - No API keys compiled into `BuildConfig`.
 - Release versioning reads `ZEST_VERSION_CODE` and `ZEST_VERSION_NAME` Gradle properties.
 - Release signing is mandatory for release artifacts and reads `ZEST_RELEASE_STORE_FILE`, `ZEST_RELEASE_STORE_PASSWORD`, `ZEST_RELEASE_KEY_ALIAS`, and `ZEST_RELEASE_KEY_PASSWORD` from the environment.
+- `verifySourceTreeForBuild` must pass before release work begins.
 - `minifyReleaseWithR8` must succeed.
 - 429 and quota failures surface a specific analysis error panel with user guidance.
 
@@ -65,7 +80,8 @@ Release hardening:
 
 ```mermaid
 flowchart TB
-    Debug[TestDebugUnitTest] --> Release[compileReleaseKotlin]
+    Guard[verifySourceTreeForBuild] --> Debug[TestDebugUnitTest]
+    Debug --> Release[compileReleaseKotlin]
     Release --> R8[minifyReleaseWithR8]
     R8 --> Signed[Signed release artifact]
     Signed --> QA[Manual UI check]
@@ -74,6 +90,7 @@ flowchart TB
 ## Verification Checklist
 
 - Unit tests pass.
+- `verifySourceTreeForBuild` passes.
 - Release APK assembles with signing environment variables present.
 - Android test APK assembles.
 - `rg "BuildConfig|local.properties|USDA_API_KEY" app/src/main app/build.gradle.kts` shows no embedded key source.
@@ -86,4 +103,8 @@ flowchart TB
 - Scan history persists after navigating away from Results.
 - Delete from History removes the Room row and locally stored scan image when the image is under app-owned storage.
 - Result page shows compact ingredient bubbles without rule-based sublabels.
-- Analysis screen title reads `Analysis` with `Nova Classification` as the subtitle.
+- Analysis and results screens use the shared type scale, spacing, and Zest color scheme.
+- Native launcher icon and splash resources use the shared Zest mark.
+- Compose splash appears on cold start before the scanner home screen.
+- Barcode mode changes the primary action text to `Scan Barcode`.
+- Settings and History use the same header scale and spacing.

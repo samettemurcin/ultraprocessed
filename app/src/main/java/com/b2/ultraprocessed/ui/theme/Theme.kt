@@ -16,6 +16,11 @@ private val DarkColorScheme = darkColorScheme(
     onTertiary = Color.White,
     onBackground = Color.White,
     onSurface = Color.White,
+    surfaceVariant = Color(0xFF111318),
+    onSurfaceVariant = Color(0xFFBDC5CB),
+    outline = Color(0xFF1F2937),
+    error = Red400,
+    onError = Color.Black,
 )
 
 @Composable

@@ -6,6 +6,7 @@ The storage contract is intentionally split by sensitivity:
 
 - secrets live in encrypted preferences,
 - scan history lives in Room,
+- non-secret preferences live in app SharedPreferences,
 - captured images remain local files until deleted,
 - provider keys are never shown back in plain text.
 
@@ -15,7 +16,7 @@ The storage contract is intentionally split by sensitivity:
 - `storage/room/NovaDatabase.kt`
 - `storage/room/ScanResult.kt`
 - `storage/room/ScanResultDao.kt`
-- `storage/datastore/AppSettings.kt`
+- `storage/preferences/AppPreferences.kt`
 - `ui/UltraProcessedApp.kt`
 - `ui/SettingsScreen.kt`
 
@@ -33,6 +34,16 @@ Rules:
 - Never preload saved keys into Compose state.
 - Save/delete methods return commit success.
 - UI stores only boolean key presence.
+
+## Non-Secret Preferences
+
+`AppPreferences` stores local app settings that are not secrets.
+
+Current preferences:
+
+- Sound effects enabled or disabled.
+
+This data is safe to keep in normal app preferences because it does not contain credentials, health data, or scan content.
 
 ## Room History
 
@@ -98,6 +109,8 @@ Local:
 - Allergen result
 - History rows
 - API keys
+- Sound preference state
+- App sounds bundled under `res/raw`
 
 Network:
 
@@ -126,4 +139,8 @@ The settings screen only shows metadata inferred from the saved LLM key:
 - default model name
 - whether the provider accepts images
 
-It does not display the key itself and it does not provide a USDA key input surface in the UI.
+It does not display the key itself. USDA access is also stored through `SecretKeyManager` and treated as sensitive.
+
+## History Usage Fields
+
+History rows include estimated token and cost fields. These values are local estimates produced by the app unless a provider workflow is updated to persist exact provider-reported usage.

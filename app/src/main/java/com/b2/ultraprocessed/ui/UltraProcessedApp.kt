@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -20,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.b2.ultraprocessed.BuildConfig
+import com.b2.ultraprocessed.storage.preferences.AppPreferences
 import com.b2.ultraprocessed.network.llm.LlmApiKeyVerifier
 import com.b2.ultraprocessed.network.llm.LlmProviderResolver
 import com.b2.ultraprocessed.network.llm.ResultChatContext
@@ -29,6 +31,8 @@ import com.b2.ultraprocessed.network.llm.SecretLlmApiKeyProvider
 import com.b2.ultraprocessed.storage.room.NovaDatabase
 import com.b2.ultraprocessed.storage.room.ScanResult as ScanResultEntity
 import com.b2.ultraprocessed.storage.secrets.SecretKeyManager
+import com.b2.ultraprocessed.ui.audio.AppSoundEvent
+import com.b2.ultraprocessed.ui.audio.AppSoundManager
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import java.io.File
 import java.text.SimpleDateFormat
@@ -40,8 +44,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 
 data class AppTimingConfig(
-    /** Production default: do not add artificial startup delay. */
-    val splashDurationMillis: Long = 0L,
+    /** Production default: show the animated brand loading screen on cold start. */
+    val splashDurationMillis: Long = 4_200L,
     /** Production default: show results as soon as analysis completes. */
     val analysisMinimumDisplayMillis: Long = 0L,
 )
@@ -53,6 +57,8 @@ fun UltraProcessedApp(
 ) {
     val appContext = LocalContext.current.applicationContext
     val secretKeyManager = remember(appContext) { SecretKeyManager(appContext) }
+    val appPreferences = remember(appContext) { AppPreferences(appContext) }
+    val soundManager = remember(appContext) { AppSoundManager(appContext) }
     val resultChatWorkflow = remember(appContext) {
         ResultChatWorkflowFactory.create(
             context = appContext,
@@ -71,9 +77,9 @@ fun UltraProcessedApp(
     val historySummary = remember(storedHistory) {
         storedHistory.toHistoryUsageSummaryUi()
     }
-    var destination by rememberSaveable { mutableStateOf(AppDestination.Splash) }
     var hasLlmApiKey by rememberSaveable { mutableStateOf(false) }
     var hasUsdaApiKey by rememberSaveable { mutableStateOf(false) }
+    var soundEffectsEnabled by rememberSaveable { mutableStateOf(appPreferences.soundEffectsEnabled) }
     var llmKeyMetadata by remember { mutableStateOf<KeyMetadata?>(null) }
     var selectedModelId by rememberSaveable {
         mutableStateOf(AppCatalog.modelOptions.first().id)
@@ -84,6 +90,24 @@ fun UltraProcessedApp(
     var analysisMode by remember { mutableStateOf(AnalysisMode.LabelImage) }
     var analysisErrorMessage by remember { mutableStateOf("") }
     var currentScanResult by remember { mutableStateOf<ScanResultUi?>(null) }
+    var destination by rememberSaveable { mutableStateOf(AppDestination.Splash) }
+    val splashDurationMillis = if (soundEffectsEnabled) {
+        soundManager.startupCueDurationMillis.takeIf { it > 0L } ?: timingConfig.splashDurationMillis
+    } else {
+        timingConfig.splashDurationMillis
+    }
+
+    DisposableEffect(soundManager) {
+        onDispose {
+            soundManager.release()
+        }
+    }
+
+    fun playSound(event: AppSoundEvent) {
+        if (soundEffectsEnabled) {
+            soundManager.play(event)
+        }
+    }
 
     LaunchedEffect(secretKeyManager) {
         val bootstrapUsdaKey = decodeBootstrapSecret(BuildConfig.USDA_BOOTSTRAP_API_KEY_B64)
@@ -137,7 +161,8 @@ fun UltraProcessedApp(
             ) { screen ->
                 when (screen) {
                     AppDestination.Splash -> SplashScreen(
-                        displayDurationMillis = timingConfig.splashDurationMillis,
+                        displayDurationMillis = splashDurationMillis,
+                        onSoundEffect = { event -> playSound(event) },
                         onComplete = { destination = AppDestination.Scanner },
                     )
 
@@ -161,6 +186,7 @@ fun UltraProcessedApp(
                         },
                         onSettings = { destination = AppDestination.Settings },
                         onHistory = { destination = AppDestination.History },
+                        onSoundEffect = { event -> playSound(event) },
                     )
 
                     AppDestination.Analyzing -> AnalyzingScreen(
@@ -180,9 +206,11 @@ fun UltraProcessedApp(
                                 runCatching {
                                     scanResultDao.insertScanResult(result.toScanResultEntity())
                                 }.onSuccess {
+                                    playSound(AppSoundEvent.Success)
                                     currentScanResult = result
                                     destination = AppDestination.Results
                                 }.onFailure {
+                                    playSound(AppSoundEvent.Error)
                                     deleteLocalScanImage(appContext, result.labelImagePath)
                                     analysisErrorMessage = "Could not save scan history. Please try again."
                                     destination = AppDestination.AnalysisError
@@ -190,6 +218,7 @@ fun UltraProcessedApp(
                             }
                         },
                         onFailure = { message ->
+                            playSound(AppSoundEvent.Error)
                             analysisErrorMessage = message
                             barcodeValue = null
                             destination = AppDestination.AnalysisError
@@ -259,6 +288,7 @@ fun UltraProcessedApp(
                         selectedModelId = selectedModelId,
                         modelOptions = AppCatalog.modelOptions,
                         llmKeyMetadata = llmKeyMetadata,
+                        soundEffectsEnabled = soundEffectsEnabled,
                         onBack = { destination = AppDestination.Scanner },
                         onLlmApiKeySaved = { key ->
                             runCatching {
@@ -335,12 +365,24 @@ fun UltraProcessedApp(
                             }.getOrDefault(false)
                         },
                         onModelSelected = { selectedModelId = it },
+                        onSoundEffectsChanged = { enabled ->
+                            soundEffectsEnabled = enabled
+                            appPreferences.soundEffectsEnabled = enabled
+                        },
                     )
 
                     AppDestination.History -> HistoryScreen(
                         historyItems = historyItems,
                         historySummary = historySummary,
                         onBack = { destination = AppDestination.Scanner },
+                        onClearAll = {
+                            coroutineScope.launch {
+                                historyItems.forEach { item ->
+                                    deleteLocalScanImage(appContext, item.capturedImagePath)
+                                }
+                                scanResultDao.deleteAllScanResults()
+                            }
+                        },
                         onClearItem = { item ->
                             item.id.toLongOrNull()?.let { id ->
                                 coroutineScope.launch {
@@ -400,6 +442,7 @@ private fun ScanResultEntity.toHistoryItemUi(): HistoryItemUi =
         productName = productName,
         novaGroup = novaGroup,
         scannedAt = SCAN_TIME_FORMAT.format(Date(scannedAt)),
+        scannedAtMillis = scannedAt,
         summary = explanation,
         capturedImagePath = capturedImagePath,
         isBarcodeLookupOnly = isBarcodeLookupOnly,

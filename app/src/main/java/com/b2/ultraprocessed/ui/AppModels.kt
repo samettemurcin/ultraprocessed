@@ -57,6 +57,7 @@ data class HistoryItemUi(
     val productName: String,
     val novaGroup: Int,
     val scannedAt: String,
+    val scannedAtMillis: Long = 0L,
     val summary: String,
     val capturedImagePath: String? = null,
     val isBarcodeLookupOnly: Boolean = false,

@@ -1,27 +1,33 @@
 package com.b2.ultraprocessed.ui
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.AccessTime
+import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.DeleteOutline
-import androidx.compose.material.icons.filled.Money
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.QrCode
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Icon
@@ -31,19 +37,50 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.b2.ultraprocessed.R
+import com.b2.ultraprocessed.ui.theme.Amber400
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import com.b2.ultraprocessed.ui.theme.Emerald400
-import com.b2.ultraprocessed.ui.theme.Emerald500
+import com.b2.ultraprocessed.ui.theme.SpaceGroteskFontFamily
+import com.b2.ultraprocessed.ui.theme.SkyBlue400
 import java.util.Locale
+import kotlin.math.roundToInt
+
+private object HistoryMetrics {
+    val Grid = 8.dp
+    val Space2 = 16.dp
+    val Space3 = 24.dp
+    val ScreenPadding = 24.dp
+    val HeaderIcon = 40.dp
+    val CardRadius = 18.dp
+    val CardMinHeight = 76.dp
+    val StatusIconBox = 40.dp
+    val MetricHeight = 48.dp
+}
+
+private object HistoryType {
+    val PageTitle = UiTextSizes.ScreenTitle
+    val MetricValue = UiTextSizes.Body
+    val MetricLabel = UiTextSizes.Micro
+    val Notice = UiTextSizes.Caption
+    val CardTitle = UiTextSizes.BodySmall
+    val CardMeta = UiTextSizes.Caption
+    val CardUsage = UiTextSizes.Micro
+    val Status = UiTextSizes.Caption
+}
 
 @Composable
 fun HistoryScreen(
     historyItems: List<HistoryItemUi>,
     historySummary: HistoryUsageSummaryUi,
     onBack: () -> Unit,
+    onClearAll: () -> Unit,
+    @Suppress("UNUSED_PARAMETER")
     onClearItem: (HistoryItemUi) -> Unit,
 ) {
     Column(
@@ -51,280 +88,428 @@ fun HistoryScreen(
             .fillMaxSize()
             .background(DarkBg),
     ) {
-        AppHeader(
-            title = "History",
-            subtitle = AppBrand.name,
-            navigationAction = backHeaderAction(onBack),
+        HistoryHeader(
+            hasHistory = historyItems.isNotEmpty(),
+            onBack = onBack,
+            onClearAll = onClearAll,
         )
 
-        UsageSummaryCard(summary = historySummary)
+        Spacer(modifier = Modifier.height(HistoryMetrics.Grid))
 
-        Surface(
-            color = Color.White.copy(alpha = 0.03f),
-            shape = RoundedCornerShape(12.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 8.dp),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Default.Warning, contentDescription = null, tint = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Stored locally via Room DB · No cloud sync",
-                    color = Color.White.copy(alpha = 0.25f),
-                    fontSize = 11.sp,
-                )
-            }
-        }
+        UsageSummaryStrip(summary = historySummary)
+
+        LocalStorageNotice()
 
         if (historyItems.isEmpty()) {
-            Box(
+            Column(
                 modifier = Modifier
                     .weight(1f)
-                    .fillMaxWidth(),
-                contentAlignment = Alignment.Center,
+                    .fillMaxWidth()
+                    .padding(horizontal = HistoryMetrics.ScreenPadding)
+                    .padding(top = HistoryMetrics.Space3),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text(
-                    text = "No scans yet. Scan or upload an ingredient label to build local history.",
-                    color = Color.White.copy(alpha = 0.4f),
+                EmptyHistoryState()
+                AppFooter(
+                    modifier = Modifier
+                        .navigationBarsPadding()
+                        .padding(bottom = HistoryMetrics.Space2),
                 )
             }
         } else {
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                    horizontal = 20.dp,
-                    vertical = 12.dp,
+                contentPadding = PaddingValues(
+                    horizontal = HistoryMetrics.ScreenPadding,
+                    vertical = HistoryMetrics.Grid,
                 ),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(HistoryMetrics.Space2),
             ) {
                 items(historyItems, key = { it.id }) { item ->
-                    val verdict = when {
-                        item.isBarcodeLookupOnly ->
-                            Triple("USDA", Color(0xFF38BDF8), Icons.Default.QrCode)
-                        item.novaGroup == 1 ->
-                            Triple("PASS", Emerald400, Icons.Default.CheckCircle)
-                        item.novaGroup == 2 || item.novaGroup == 3 ->
-                            Triple("CAUTION", Color(0xFFFBBF24), Icons.Default.Warning)
-                        else ->
-                            Triple("AVOID", Color(0xFFF87171), Icons.Default.Warning)
-                    }
-                    Surface(
-                        color = verdict.second.copy(alpha = 0.1f),
-                        shape = RoundedCornerShape(20.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, verdict.second.copy(alpha = 0.2f)),
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(14.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(36.dp)
-                                    .background(verdict.second.copy(alpha = 0.12f), RoundedCornerShape(10.dp)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Icon(verdict.third, contentDescription = null, tint = verdict.second, modifier = Modifier.size(18.dp))
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = item.productName,
-                                    color = Color.White.copy(alpha = 0.78f),
-                                    fontWeight = FontWeight.SemiBold,
-                                    fontSize = 14.sp,
-                                )
-                                Spacer(modifier = Modifier.height(3.dp))
-                                Text(
-                                    text = if (item.isBarcodeLookupOnly) {
-                                        "Barcode lookup · ${item.scannedAt}"
-                                    } else {
-                                        "NOVA ${item.novaGroup} · ${item.scannedAt}"
-                                    },
-                                    color = Color.White.copy(alpha = 0.25f),
-                                    fontSize = 11.sp,
-                                )
-                                if (item.capturedImagePath != null) {
-                                    Spacer(modifier = Modifier.height(3.dp))
-                                    Text(
-                                        text = "Saved image: ${item.capturedImagePath.substringAfterLast('/')}",
-                                        color = Color.White.copy(alpha = 0.22f),
-                                        fontSize = 10.sp,
-                                    )
-                                }
-                                if (item.estimatedTokens > 0 || item.modelName.isNotBlank()) {
-                                    Spacer(modifier = Modifier.height(3.dp))
-                                    Text(
-                                        text = listOfNotNull(
-                                            item.modelName.takeIf { it.isNotBlank() },
-                                            if (item.estimatedTokens > 0) "${formatTokens(item.estimatedTokens)} tokens" else null,
-                                            if (item.estimatedCostUsd > 0.0) formatMoney(item.estimatedCostUsd) + " est." else null,
-                                        ).joinToString(" · "),
-                                        color = Color.White.copy(alpha = 0.22f),
-                                        fontSize = 10.sp,
-                                    )
-                                }
-                            }
-                            Text(
-                                text = verdict.first,
-                                color = verdict.second,
-                                fontSize = 10.sp,
-                                fontWeight = FontWeight.SemiBold,
-                                letterSpacing = 1.4.sp,
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Surface(
-                                onClick = { onClearItem(item) },
-                                color = Color.White.copy(alpha = 0.04f),
-                                shape = RoundedCornerShape(12.dp),
-                                border = androidx.compose.foundation.BorderStroke(
-                                    1.dp,
-                                    Color.White.copy(alpha = 0.08f),
-                                ),
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Default.DeleteOutline,
-                                    contentDescription = "Delete",
-                                    tint = Color.White.copy(alpha = 0.4f),
-                                    modifier = Modifier.padding(10.dp),
-                                )
-                            }
-                        }
-                    }
+                    HistoryVerdictCard(item = item)
+                }
+                item {
+                    AppFooter(
+                        modifier = Modifier
+                            .padding(top = HistoryMetrics.Space2)
+                            .navigationBarsPadding()
+                            .padding(bottom = HistoryMetrics.Space2),
+                    )
                 }
             }
         }
+    }
+}
 
-        AppFooter(
-            modifier = Modifier.padding(horizontal = 20.dp, vertical = 12.dp),
+@Composable
+private fun EmptyHistoryState() {
+    Surface(
+        color = Color.White.copy(alpha = 0.025f),
+        shape = RoundedCornerShape(24.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(
+            modifier = Modifier.padding(horizontal = HistoryMetrics.Space3, vertical = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(56.dp)
+                    .background(Emerald400.copy(alpha = 0.10f), RoundedCornerShape(18.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = Icons.Default.History,
+                    contentDescription = null,
+                    tint = Emerald400.copy(alpha = 0.78f),
+                    modifier = Modifier.size(26.dp),
+                )
+            }
+            Spacer(modifier = Modifier.height(HistoryMetrics.Space2))
+            Text(
+                text = stringResource(R.string.history_empty_title),
+                color = Color.White.copy(alpha = 0.82f),
+                fontFamily = SpaceGroteskFontFamily,
+                fontSize = UiTextSizes.Body,
+                fontWeight = FontWeight.SemiBold,
+            )
+            Spacer(modifier = Modifier.height(HistoryMetrics.Grid))
+            Text(
+                text = stringResource(R.string.history_empty_body),
+                color = Color.White.copy(alpha = 0.42f),
+                fontSize = UiTextSizes.BodySmall,
+                lineHeight = 18.sp,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryHeader(
+    hasHistory: Boolean,
+    onBack: () -> Unit,
+    onClearAll: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(
+                start = HistoryMetrics.Space2,
+                top = HistoryMetrics.Space2,
+                end = HistoryMetrics.Space2,
+                bottom = HistoryMetrics.Grid,
+            ),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Surface(
+            onClick = onBack,
+            color = Color.Transparent,
+            shape = CircleShape,
+            modifier = Modifier.size(HistoryMetrics.HeaderIcon),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White.copy(alpha = 0.78f),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(HistoryMetrics.Space2))
+
+        Text(
+            text = stringResource(R.string.history_title),
+            color = Color.White.copy(alpha = 0.94f),
+            fontFamily = SpaceGroteskFontFamily,
+            fontSize = HistoryType.PageTitle,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = (-0.2).sp,
+            modifier = Modifier.weight(1f),
+        )
+
+        Surface(
+            onClick = {
+                if (hasHistory) onClearAll()
+            },
+            color = Color.Transparent,
+            shape = CircleShape,
+            modifier = Modifier.size(HistoryMetrics.HeaderIcon),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.Default.DeleteOutline,
+                    contentDescription = "Clear history",
+                    tint = Color.White.copy(alpha = if (hasHistory) 0.54f else 0.20f),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UsageSummaryStrip(summary: HistoryUsageSummaryUi) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = HistoryMetrics.ScreenPadding),
+        horizontalArrangement = Arrangement.spacedBy(HistoryMetrics.Grid),
+    ) {
+        UsageMiniPill(
+            label = stringResource(R.string.history_tokens_label),
+            value = formatTokens(summary.totalTokens),
+            modifier = Modifier.weight(1f),
+        )
+        UsageMiniPill(
+            label = stringResource(R.string.history_estimated_cost_label),
+            value = formatMoney(summary.estimatedCostUsd),
+            modifier = Modifier.weight(1f),
+        )
+        UsageMiniPill(
+            label = stringResource(R.string.history_scans_label),
+            value = summary.totalScans.toString(),
+            modifier = Modifier.weight(1f),
         )
     }
 }
 
 @Composable
-private fun UsageSummaryCard(
-    summary: HistoryUsageSummaryUi,
-) {
-    Surface(
-        color = Color.White.copy(alpha = 0.04f),
-        shape = RoundedCornerShape(22.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Emerald500.copy(alpha = 0.12f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 20.dp, vertical = 8.dp),
-    ) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(34.dp)
-                        .background(Emerald500.copy(alpha = 0.12f), RoundedCornerShape(12.dp)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.Default.Money, contentDescription = null, tint = Emerald400, modifier = Modifier.size(18.dp))
-                }
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Usage snapshot",
-                        color = Color.White.copy(alpha = 0.72f),
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "${summary.totalScans} scans · estimated from stored model usage",
-                        color = Color.White.copy(alpha = 0.34f),
-                        fontSize = 11.sp,
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                MetricPill(
-                    label = "Tokens",
-                    value = formatTokens(summary.totalTokens),
-                    modifier = Modifier.weight(1f),
-                )
-                MetricPill(
-                    label = "Estimated cost",
-                    value = formatMoney(summary.estimatedCostUsd),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
-            if (summary.modelUsage.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(14.dp))
-                Row(
-                    modifier = Modifier.horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    summary.modelUsage.take(4).forEach { usage ->
-                        Surface(
-                            color = Color.White.copy(alpha = 0.03f),
-                            shape = RoundedCornerShape(14.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
-                        ) {
-                            Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
-                                Text(
-                                    text = usage.modelName,
-                                    color = Color.White.copy(alpha = 0.78f),
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.SemiBold,
-                                )
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "${usage.scans} scan${if (usage.scans == 1) "" else "s"} · ${formatTokens(usage.estimatedTokens)} tokens · ${formatMoney(usage.estimatedCostUsd)}",
-                                    color = Color.White.copy(alpha = 0.32f),
-                                    fontSize = 10.sp,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MetricPill(
+private fun UsageMiniPill(
     label: String,
     value: String,
     modifier: Modifier = Modifier,
 ) {
     Surface(
-        color = Color.White.copy(alpha = 0.03f),
-        shape = RoundedCornerShape(18.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
-        modifier = modifier,
+        color = Color.White.copy(alpha = 0.035f),
+        shape = RoundedCornerShape(14.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.07f)),
+        modifier = modifier.height(HistoryMetrics.MetricHeight),
     ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
+        Column(
+            modifier = Modifier.padding(horizontal = HistoryMetrics.Grid, vertical = 6.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center,
+        ) {
+            Text(
+                text = value,
+                color = Color.White.copy(alpha = 0.82f),
+                fontFamily = SpaceGroteskFontFamily,
+                fontSize = HistoryType.MetricValue,
+                fontWeight = FontWeight.Medium,
+                lineHeight = 18.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Spacer(modifier = Modifier.height(2.dp))
             Text(
                 text = label,
                 color = Color.White.copy(alpha = 0.34f),
-                fontSize = 11.sp,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                color = Color.White.copy(alpha = 0.92f),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
+                fontSize = HistoryType.MetricLabel,
+                lineHeight = 10.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
 }
 
+@Composable
+private fun LocalStorageNotice() {
+    Surface(
+        color = Color.White.copy(alpha = 0.035f),
+        shape = RoundedCornerShape(18.dp),
+        border = BorderStroke(1.dp, Color.White.copy(alpha = 0.08f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = HistoryMetrics.ScreenPadding)
+            .padding(top = HistoryMetrics.Space2, bottom = HistoryMetrics.Grid),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = HistoryMetrics.Space2, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Icon(
+                imageVector = Icons.Default.AccessTime,
+                contentDescription = null,
+                tint = Color.White.copy(alpha = 0.28f),
+                modifier = Modifier.size(18.dp),
+            )
+            Spacer(modifier = Modifier.width(HistoryMetrics.Grid))
+            Text(
+                text = stringResource(R.string.history_local_only_notice),
+                color = Color.White.copy(alpha = 0.34f),
+                fontSize = HistoryType.Notice,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+@Composable
+private fun HistoryVerdictCard(item: HistoryItemUi) {
+    val style = historyVerdictStyle(item)
+    Surface(
+        color = style.color.copy(alpha = 0.11f),
+        shape = RoundedCornerShape(HistoryMetrics.CardRadius),
+        border = BorderStroke(1.dp, style.color.copy(alpha = 0.28f)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(min = HistoryMetrics.CardMinHeight),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = HistoryMetrics.Space2, vertical = 14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(HistoryMetrics.StatusIconBox)
+                    .background(style.color.copy(alpha = 0.14f), RoundedCornerShape(14.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    imageVector = style.icon,
+                    contentDescription = null,
+                    tint = style.color,
+                    modifier = Modifier.size(20.dp),
+                )
+            }
+
+            Spacer(modifier = Modifier.width(HistoryMetrics.Space2))
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = displayProductName(item.productName.ifBlank { stringResource(R.string.results_scan_title) }),
+                    color = Color.White.copy(alpha = 0.80f),
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontSize = HistoryType.CardTitle,
+                    fontWeight = FontWeight.SemiBold,
+                    lineHeight = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Spacer(modifier = Modifier.height(HistoryMetrics.Grid / 2))
+                Text(
+                    text = if (item.isBarcodeLookupOnly) {
+                        "Barcode lookup · ${relativeScanTime(item)}"
+                    } else {
+                        "NOVA ${item.novaGroup} · ${relativeScanTime(item)}"
+                    },
+                    color = Color.White.copy(alpha = 0.34f),
+                    fontSize = HistoryType.CardMeta,
+                    fontWeight = FontWeight.Medium,
+                    lineHeight = 14.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                val usageLine = historyUsageLine(item)
+                if (usageLine.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(HistoryMetrics.Grid / 2))
+                    Text(
+                        text = usageLine,
+                        color = Color.White.copy(alpha = 0.26f),
+                        fontSize = HistoryType.CardUsage,
+                        lineHeight = 10.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(HistoryMetrics.Space2))
+
+            Text(
+                text = style.label,
+                color = style.color,
+                fontFamily = SpaceGroteskFontFamily,
+                fontSize = HistoryType.Status,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 12.sp,
+                letterSpacing = 1.4.sp,
+            )
+        }
+    }
+}
+
+private fun historyUsageLine(item: HistoryItemUi): String =
+    listOfNotNull(
+        item.modelName.takeIf { it.isNotBlank() },
+        if (item.estimatedTokens > 0) "${formatTokens(item.estimatedTokens)} tokens" else null,
+        if (item.estimatedCostUsd > 0.0) "${formatMoney(item.estimatedCostUsd)} est." else null,
+    ).joinToString(" · ")
+
+private fun displayProductName(name: String): String {
+    val compact = name.trim().replace(Regex("\\s+"), " ")
+    if (compact.isBlank()) return compact
+    val letterCount = compact.count { it.isLetter() }
+    val uppercaseCount = compact.count { it.isLetter() && it.isUpperCase() }
+    if (letterCount == 0 || uppercaseCount < letterCount * 0.70f) return compact
+    return compact
+        .lowercase(Locale.US)
+        .split(" ")
+        .joinToString(" ") { word ->
+            word.replaceFirstChar { char ->
+                if (char.isLowerCase()) char.titlecase(Locale.US) else char.toString()
+            }
+        }
+}
+
+@Composable
+private fun historyVerdictStyle(item: HistoryItemUi): HistoryVerdictStyle =
+    when {
+        item.isBarcodeLookupOnly -> HistoryVerdictStyle("LOOKUP", SkyBlue400, Icons.Default.QrCode)
+        item.novaGroup == 1 -> HistoryVerdictStyle("PASS", Emerald400, Icons.Default.CheckCircle)
+        item.novaGroup == 2 || item.novaGroup == 3 -> HistoryVerdictStyle("CAUTION", Amber400, Icons.Default.Warning)
+        else -> HistoryVerdictStyle("AVOID", Color(0xFFFF6B6B), Icons.Default.Cancel)
+    }
+
+private data class HistoryVerdictStyle(
+    val label: String,
+    val color: Color,
+    val icon: androidx.compose.ui.graphics.vector.ImageVector,
+)
+
+private fun relativeScanTime(item: HistoryItemUi): String {
+    val timestamp = item.scannedAtMillis
+    if (timestamp <= 0L) return item.scannedAt
+    val elapsedMillis = (System.currentTimeMillis() - timestamp).coerceAtLeast(0L)
+    val elapsedMinutes = (elapsedMillis / 60_000L).toInt()
+    return when {
+        elapsedMinutes < 1 -> "just now"
+        elapsedMinutes < 60 -> "$elapsedMinutes min ago"
+        elapsedMinutes < 60 * 24 -> "${elapsedMinutes / 60} hr ago"
+        elapsedMinutes < 60 * 24 * 7 -> "${elapsedMinutes / (60 * 24)} days ago"
+        else -> item.scannedAt
+    }
+}
+
 private fun formatTokens(tokens: Int): String {
-    return String.format(Locale.US, "%,d", tokens.coerceAtLeast(0))
+    val safeTokens = tokens.coerceAtLeast(0)
+    return if (safeTokens >= 10_000) {
+        String.format(Locale.US, "%.1fk", safeTokens / 1_000.0)
+    } else {
+        String.format(Locale.US, "%,d", safeTokens)
+    }
 }
 
 private fun formatMoney(value: Double): String {
-    return String.format(Locale.US, "$%.4f", value.coerceAtLeast(0.0))
+    val safeValue = value.coerceAtLeast(0.0)
+    return if (safeValue > 0.0 && safeValue < 0.0001) {
+        "\$<0.0001"
+    } else {
+        val roundedCents = (safeValue * 100.0).roundToInt()
+        if (roundedCents >= 1) {
+            String.format(Locale.US, "\$%.2f", safeValue)
+        } else {
+            String.format(Locale.US, "\$%.4f", safeValue)
+        }
+    }
 }

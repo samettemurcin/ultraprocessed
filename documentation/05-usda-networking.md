@@ -1,8 +1,10 @@
 # USDA Networking
 
-USDA lookup is optional and user-key backed. The app no longer compiles USDA keys through Gradle or `BuildConfig`.
+USDA lookup is optional and user-key backed. The app does not require USDA keys to be compiled through Gradle or `BuildConfig`, although a base64 bootstrap key can be provided through local developer properties for setup convenience.
 
 The USDA path is a lookup dependency, not a classifier. It only enriches barcode scans with product ingredients and brand metadata.
+
+The scanner still requires the LLM workflow to classify the ingredient evidence returned by USDA. USDA does not produce NOVA results or allergen verdicts.
 
 ## Files
 
@@ -23,7 +25,7 @@ sequenceDiagram
     participant Service as UsdaApiService
     participant USDA
 
-    Settings->>Secrets: saveApiKey(USDA_API_KEY, typed value)
+    Settings->>Secrets: saveApiKey(USDA_API_KEY, typed value or bootstrap value)
     Provider->>Secrets: getApiKey(USDA_API_KEY)
     Provider-->>Service: trimmed key
     Service->>USDA: HTTPS request with api_key query param

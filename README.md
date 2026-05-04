@@ -2,6 +2,16 @@
 
 Zest helps you scan packaged food labels and understand how processed they look. It focuses on the ingredient panel, gives a NOVA-style classification, highlights important ingredients, and keeps your scan history on your device.
 
+## Why The Name Zest?
+
+`Zest` is meant to feel fresh, clear, and food-focused. The app is built to help you cut through label noise, understand what is really inside a product, and make better everyday choices without friction.
+
+In practice, Zest is about:
+
+- reading labels faster
+- spotting ingredient-level signals clearly
+- choosing healthier options with more confidence
+
 ## What Zest Does
 
 - Scan food ingredient labels with the camera.
@@ -11,6 +21,8 @@ Zest helps you scan packaged food labels and understand how processed they look.
 - Break ingredients into compact color-coded bubbles.
 - Show allergen signals in a separate section.
 - Save scan history locally on your phone.
+- Show local estimated token and cost usage in scan history.
+- Use the same Zest splash, launcher icon, typography, and sound setting across the app.
 - Keep API keys encrypted on device.
 
 ## Features
@@ -19,8 +31,10 @@ Zest helps you scan packaged food labels and understand how processed they look.
 - Compact, easy-to-read results.
 - Separate ingredient and allergen sections.
 - Local scan history.
+- Estimated local usage summary for tokens and cost.
 - Optional barcode lookup.
 - Optional model metadata in Settings.
+- Optional app sound effects.
 - No sign-in required.
 
 ## How To Set It Up
@@ -105,3 +119,4 @@ If the app fails to analyze a label:
 
 - License: [LICENSE/LICENSE.md](LICENSE/LICENSE.md)
 - Technical documentation: [documentation/README.md](documentation/README.md)
+- Non-Android architecture guide: [documentation/00-android-app-guide.md](documentation/00-android-app-guide.md)

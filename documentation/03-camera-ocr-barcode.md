@@ -1,6 +1,6 @@
 # Camera, OCR, And Barcode
 
-This component owns product input capture. It turns physical product labels or barcodes into local image paths or barcode values for downstream analysis. OCR remains available as a fallback path, but the default label path can send the captured image into the staged LLM workflow when the user has saved an LLM key.
+This component owns product input capture. It turns physical product labels or barcodes into local image paths or barcode values for downstream analysis. OCR remains available as a fallback path, but the default label path sends the captured image into the staged LLM workflow when the user has saved an LLM key.
 
 ## Files
 
@@ -18,7 +18,8 @@ This component owns product input capture. It turns physical product labels or b
 
 ```mermaid
 flowchart LR
-    User[User taps Scan Label] --> CameraX[CameraX ImageCapture]
+    Mode[Ingredient Label mode] --> User[User taps Scan Label]
+    User --> CameraX[CameraX ImageCapture]
     CameraX --> File[App-local image file]
     File --> Analysis[FoodAnalysisPipeline]
     Analysis --> LLM[LLM ingredient extraction]
@@ -40,11 +41,21 @@ flowchart LR
 
 ```mermaid
 flowchart LR
-    Preview[CameraX Preview] --> Analyzer[ImageAnalysis]
+    Mode[Barcode Scan mode] --> CTA[Primary button reads Scan Barcode]
+    CTA --> Preview[CameraX Preview]
+    Preview --> Analyzer[ImageAnalysis]
     Analyzer --> MLKit[ML Kit Barcode Scanner]
     MLKit --> Code[UPC/EAN/code value]
     Code --> USDA[USDA lookup]
 ```
+
+## Scanner UI Rules
+
+- The camera preview is the content surface; scan brackets are an overlay with padding, not a border around the image.
+- The scan line and brackets should feel related: subtle green, similar opacity, and restrained thickness.
+- Upload and scan mode pills use the shared 8pt spacing system and shared typography.
+- Barcode mode changes the main CTA text to `Scan Barcode`.
+- Ingredient mode changes the main CTA text to `Scan Label`.
 
 ## Implementation Notes
 
@@ -54,6 +65,7 @@ flowchart LR
 - Imported images are copied into app-local external files before analysis.
 - OCR uses ML Kit Text Recognition with Latin options.
 - OCR is intentionally behind the `OcrPipeline` interface so future on-device OCR can feed the same classification/allergen stages.
+- Test mode can disable live camera preview so UI tests do not require camera hardware.
 
 ## Failure Behavior
 

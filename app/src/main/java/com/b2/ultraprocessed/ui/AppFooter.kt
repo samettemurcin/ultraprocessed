@@ -16,9 +16,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.b2.ultraprocessed.R
 
 @Composable
 fun AppFooter(
@@ -31,19 +33,19 @@ fun AppFooter(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "© The Benevolent Bandwidth Foundation, Inc. · Massachusetts Nonprofit Corporation. All rights reserved.",
+            text = stringResource(R.string.footer_copyright),
             modifier = Modifier.widthIn(max = 320.dp),
             color = Color.White.copy(alpha = 0.15f),
-            fontSize = 9.sp,
-            lineHeight = 13.sp,
+            fontSize = UiTextSizes.Caption,
+            lineHeight = 12.sp,
             textAlign = TextAlign.Center,
         )
         Spacer(modifier = Modifier.height(4.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = "Built with ",
+                text = "${stringResource(R.string.footer_built_with)} ",
                 color = Color.White.copy(alpha = 0.16f),
-                fontSize = 9.sp,
+                fontSize = UiTextSizes.Caption,
             )
             Icon(
                 imageVector = Icons.Default.Favorite,
@@ -52,9 +54,9 @@ fun AppFooter(
                 modifier = Modifier.size(10.dp),
             )
             Text(
-                text = " for humanity",
+                text = " ${stringResource(R.string.footer_humanity)}",
                 color = Color.White.copy(alpha = 0.16f),
-                fontSize = 9.sp,
+                fontSize = UiTextSizes.Caption,
             )
         }
     }

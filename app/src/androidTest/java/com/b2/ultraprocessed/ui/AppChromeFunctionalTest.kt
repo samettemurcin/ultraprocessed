@@ -37,7 +37,7 @@ class AppChromeFunctionalTest {
 
         composeRule.onNodeWithTag(AppTestTags.HEADER).assertIsDisplayed()
         composeRule.onNodeWithTag(AppTestTags.FOOTER).assertIsDisplayed()
-        composeRule.onNodeWithText("Live scanner").assertIsDisplayed()
+        composeRule.onNodeWithText("Zest").assertIsDisplayed()
         composeRule.onNodeWithTag(AppTestTags.HEADER_ACTION_HISTORY).performClick()
         composeRule.onNodeWithTag(AppTestTags.HEADER_ACTION_SETTINGS).performClick()
         composeRule.onNodeWithTag(AppTestTags.SCANNER_BARCODE_BUTTON).performClick()

@@ -10,8 +10,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -30,7 +33,8 @@ import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material3.AssistChip
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -39,6 +43,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,15 +55,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.b2.ultraprocessed.BuildConfig
+import com.b2.ultraprocessed.R
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import com.b2.ultraprocessed.ui.theme.Emerald400
 import com.b2.ultraprocessed.ui.theme.Emerald500
+import com.b2.ultraprocessed.ui.theme.SpaceGroteskFontFamily
 import com.b2.ultraprocessed.network.llm.LlmProviderResolver
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -81,17 +90,36 @@ private enum class PingStatus {
     Failure,
 }
 
+private object SettingsMetrics {
+    val Grid = 8.dp
+    val Space2 = 16.dp
+    val Space3 = 24.dp
+    val ScreenPadding = 24.dp
+    val HeaderIcon = 40.dp
+    val CardRadius = 18.dp
+}
+
+private object SettingsType {
+    val PageTitle = UiTextSizes.ScreenTitle
+    val Section = UiTextSizes.Caption
+    val Title = UiTextSizes.BodySmall
+    val Body = UiTextSizes.BodySmall
+    val Meta = UiTextSizes.Caption
+}
+
 @Composable
 fun SettingsScreen(
     hasLlmApiKey: Boolean,
     selectedModelId: String,
     modelOptions: List<ModelOption>,
     llmKeyMetadata: KeyMetadata? = null,
+    soundEffectsEnabled: Boolean,
     onBack: () -> Unit,
     onLlmApiKeySaved: suspend (String) -> KeySaveResult,
     onLlmApiKeyPing: suspend (String?) -> KeySaveResult,
     onLlmApiKeyDeleted: suspend () -> Boolean,
     onModelSelected: (String) -> Unit,
+    onSoundEffectsChanged: (Boolean) -> Unit,
 ) {
     val selectedModel = modelOptions.firstOrNull { it.id == selectedModelId } ?: modelOptions.firstOrNull()
 
@@ -106,28 +134,25 @@ fun SettingsScreen(
             .fillMaxSize()
             .background(DarkBg),
     ) {
-        AppHeader(
-            title = "Settings",
-            subtitle = AppBrand.name,
-            navigationAction = backHeaderAction(onBack),
-        )
+        SettingsHeader(onBack = onBack)
 
         Column(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
+                .imePadding()
+                .padding(horizontal = SettingsMetrics.ScreenPadding),
         ) {
-            SectionHeader(icon = Icons.Default.Key, text = "LLM API Key")
+            UiSectionHeader(text = stringResource(R.string.settings_llm_key_section), icon = Icons.Default.Key)
             SecureApiKeyCard(
                 hasKey = hasLlmApiKey,
-                storedDescription = "An LLM API key is stored locally with Android Keystore-backed encryption. Enter a new key only when you want to replace it.",
-                emptyDescription = "Your LLM API key is stored locally with Android Keystore-backed encryption. The saved value is never shown again after it is stored.",
-                emptyLabel = "LLM API key",
-                replacementLabel = "Replacement LLM API key",
-                saveLabel = "Save LLM key",
-                replaceLabel = "Replace LLM key",
-                deleteLabel = "Delete LLM key",
+                storedDescription = stringResource(R.string.settings_llm_key_stored_description),
+                emptyDescription = stringResource(R.string.settings_llm_key_empty_description),
+                emptyLabel = stringResource(R.string.settings_llm_key_empty_label),
+                replacementLabel = stringResource(R.string.settings_llm_key_replacement_label),
+                saveLabel = stringResource(R.string.settings_llm_key_save_button),
+                replaceLabel = stringResource(R.string.settings_llm_key_replace_button),
+                deleteLabel = stringResource(R.string.settings_llm_key_delete_button),
                 metadata = llmKeyMetadata ?: selectedModel?.let {
                     KeyMetadata(
                         modelName = it.name,
@@ -142,22 +167,60 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            SectionHeader(icon = Icons.Default.Info, text = "Under the Hood")
+            UiSectionHeader(text = stringResource(R.string.settings_sound_title), icon = Icons.AutoMirrored.Filled.VolumeUp)
             Surface(
                 color = Color.White.copy(alpha = 0.03f),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(SettingsMetrics.CardRadius),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(R.string.settings_sound_title),
+                            color = Color.White.copy(alpha = 0.78f),
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = SettingsType.Title,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = stringResource(R.string.settings_sound_body),
+                            color = Color.White.copy(alpha = 0.34f),
+                            fontSize = SettingsType.Body,
+                            lineHeight = 18.sp,
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Switch(
+                        checked = soundEffectsEnabled,
+                        onCheckedChange = onSoundEffectsChanged,
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            UiSectionHeader(text = stringResource(R.string.settings_app_features_section), icon = Icons.Default.Info)
+            Surface(
+                color = Color.White.copy(alpha = 0.03f),
+                shape = RoundedCornerShape(SettingsMetrics.CardRadius),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    TechRow(Icons.Default.CameraAlt, "CameraX", "Camera preview & image capture")
+                    TechRow(Icons.Default.CameraAlt, "Camera", stringResource(R.string.settings_feature_camera))
                     Spacer(modifier = Modifier.height(10.dp))
-                    TechRow(Icons.Default.Visibility, "ML Kit Text Recognition v2", "On-device OCR engine")
+                    TechRow(Icons.Default.Visibility, "OCR", stringResource(R.string.settings_feature_ocr))
                     Spacer(modifier = Modifier.height(10.dp))
-                    TechRow(Icons.Default.Storage, "Room Database", "Local scan history & cached results")
+                    TechRow(Icons.Default.Storage, "History", stringResource(R.string.settings_feature_history))
                     Spacer(modifier = Modifier.height(10.dp))
-                    TechRow(Icons.Default.Security, "Android Keystore", "Encrypted API key storage")
+                    TechRow(Icons.Default.Security, "Security", stringResource(R.string.settings_feature_security))
                     Spacer(modifier = Modifier.height(10.dp))
-                    TechRow(Icons.Default.Memory, "OkHttp", "Direct HTTPS calls to model APIs")
+                    TechRow(Icons.Default.Memory, "Network", stringResource(R.string.settings_feature_network))
                 }
             }
 
@@ -165,23 +228,24 @@ fun SettingsScreen(
 
             Surface(
                 color = Emerald500.copy(alpha = 0.05f),
-                shape = RoundedCornerShape(18.dp),
+                shape = RoundedCornerShape(SettingsMetrics.CardRadius),
                 border = BorderStroke(1.dp, Emerald500.copy(alpha = 0.12f)),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Privacy-First Design",
+                        text = stringResource(R.string.settings_privacy_title),
                         color = Emerald400.copy(alpha = 0.7f),
+                        fontFamily = SpaceGroteskFontFamily,
                         fontWeight = FontWeight.SemiBold,
-                        fontSize = 12.sp,
+                        fontSize = SettingsType.Title,
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "No sign-in required. When an LLM key is saved, label images are sent for ingredient extraction and extracted ingredient text is sent for classification and allergen detection. Scan history stays in local Room DB. API keys are encrypted via Android Keystore. DataStore handles preferences.",
+                        text = stringResource(R.string.settings_privacy_body),
                         color = Color.White.copy(alpha = 0.34f),
-                        fontSize = 12.sp,
-                        lineHeight = 18.sp,
+                        fontSize = SettingsType.Body,
+                        lineHeight = 19.sp,
                     )
                 }
             }
@@ -195,35 +259,61 @@ fun SettingsScreen(
                 AppFooter()
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "${AppBrand.name} · v1.0.0 · Kotlin · Jetpack Compose",
+                    text = "${AppBrand.name} · v${BuildConfig.VERSION_NAME} · Kotlin · Jetpack Compose",
                     color = Color.White.copy(alpha = 0.12f),
-                    fontSize = 11.sp,
+                    fontSize = SettingsType.Meta,
                 )
             }
 
             Spacer(modifier = Modifier.height(28.dp))
+            Spacer(modifier = Modifier.navigationBarsPadding())
         }
     }
 }
 
 @Composable
-private fun SectionHeader(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String,
-) {
+private fun SettingsHeader(onBack: () -> Unit) {
     Row(
-        modifier = Modifier.padding(bottom = 10.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .padding(
+                start = SettingsMetrics.Space2,
+                top = SettingsMetrics.Space2,
+                end = SettingsMetrics.Space2,
+                bottom = SettingsMetrics.Grid,
+            ),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, contentDescription = null, tint = Emerald400, modifier = Modifier.size(16.dp))
-        Spacer(modifier = Modifier.width(8.dp))
+        Surface(
+            onClick = onBack,
+            color = Color.Transparent,
+            shape = CircleShape,
+            modifier = Modifier.size(SettingsMetrics.HeaderIcon),
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Back",
+                    tint = Color.White.copy(alpha = 0.78f),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(SettingsMetrics.Space2))
+
         Text(
-            text = text,
-            color = Color.White.copy(alpha = 0.34f),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.8.sp,
+            text = stringResource(R.string.settings_title),
+            color = Color.White.copy(alpha = 0.94f),
+            fontFamily = SpaceGroteskFontFamily,
+            fontSize = SettingsType.PageTitle,
+            fontWeight = FontWeight.SemiBold,
+            letterSpacing = (-0.2).sp,
+            modifier = Modifier.weight(1f),
         )
+
+        Spacer(modifier = Modifier.size(SettingsMetrics.HeaderIcon))
     }
 }
 
@@ -282,13 +372,14 @@ private fun SecureApiKeyCard(
 
     Surface(
         color = Color.White.copy(alpha = 0.04f),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(SettingsMetrics.CardRadius),
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(18.dp)) {
             Text(
                 text = if (hasKey) storedDescription else emptyDescription,
                 color = Color.White.copy(alpha = 0.45f),
+                fontSize = SettingsType.Body,
                 lineHeight = 19.sp,
             )
             Spacer(modifier = Modifier.height(14.dp))
@@ -299,7 +390,12 @@ private fun SecureApiKeyCard(
                     statusMessage = null
                 },
                 modifier = Modifier.fillMaxWidth(),
-                label = { Text(if (hasKey) replacementLabel else emptyLabel) },
+                label = {
+                    Text(
+                        text = if (hasKey) replacementLabel else emptyLabel,
+                        fontSize = SettingsType.Meta,
+                    )
+                },
                 singleLine = true,
                 visualTransformation = if (showKey) {
                     VisualTransformation.None
@@ -373,7 +469,13 @@ private fun SecureApiKeyCard(
                     } else {
                         Icon(Icons.Default.Check, contentDescription = null, tint = Color.Black)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(if (hasKey) replaceLabel else saveLabel, color = Color.Black)
+                        Text(
+                            text = if (hasKey) replaceLabel else saveLabel,
+                            color = Color.Black,
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = SettingsType.Title,
+                            fontWeight = FontWeight.SemiBold,
+                        )
                     }
                 }
                 if (onPing != null) {
@@ -403,7 +505,12 @@ private fun SecureApiKeyCard(
                         } else {
                             Icon(Icons.Default.NetworkCheck, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("Ping API")
+                            Text(
+                                text = stringResource(R.string.settings_ping_api),
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = SettingsType.Title,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
                     }
                 }
@@ -440,14 +547,49 @@ private fun SecureApiKeyCard(
                         } else {
                             Icon(Icons.Default.Clear, contentDescription = null)
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(deleteLabel)
+                            Text(
+                                text = deleteLabel,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = SettingsType.Title,
+                                fontWeight = FontWeight.SemiBold,
+                            )
                         }
                     }
                 }
-                AssistChip(
-                    onClick = {},
-                    label = { Text(if (hasKey) "Key stored" else "No key stored") },
-                )
+                Surface(
+                    color = if (hasKey) Emerald500.copy(alpha = 0.12f) else Color.White.copy(alpha = 0.05f),
+                    shape = RoundedCornerShape(999.dp),
+                    border = BorderStroke(
+                        1.dp,
+                        if (hasKey) Emerald500.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.1f),
+                    ),
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .background(
+                                    if (hasKey) Emerald400 else Color.White.copy(alpha = 0.3f),
+                                    CircleShape,
+                                ),
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = if (hasKey) {
+                                stringResource(R.string.settings_key_stored)
+                            } else {
+                                stringResource(R.string.settings_key_not_stored)
+                            },
+                            color = if (hasKey) Emerald400.copy(alpha = 0.9f) else Color.White.copy(alpha = 0.4f),
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontSize = SettingsType.Meta,
+                            fontWeight = FontWeight.SemiBold,
+                        )
+                    }
+                }
                 if (onPing != null) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -481,7 +623,7 @@ private fun SecureApiKeyCard(
                                 PingStatus.Loading -> Color.White.copy(alpha = 0.38f)
                                 PingStatus.Idle -> Color.White.copy(alpha = 0.24f)
                             },
-                            fontSize = 11.sp,
+                            fontSize = SettingsType.Meta,
                         )
                     }
                 }
@@ -494,28 +636,29 @@ private fun SecureApiKeyCard(
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                             Text(
-                                text = "API Metadata",
+                                text = stringResource(R.string.settings_api_metadata),
                                 color = Emerald400.copy(alpha = 0.72f),
-                                fontSize = 11.sp,
+                                fontFamily = SpaceGroteskFontFamily,
+                                fontSize = SettingsType.Meta,
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Spacer(modifier = Modifier.height(6.dp))
                             Text(
                                 text = "Model: ${it.modelName}",
                                 color = Color.White.copy(alpha = 0.72f),
-                                fontSize = 12.sp,
+                                fontSize = SettingsType.Body,
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Provider: ${it.provider}",
                                 color = Color.White.copy(alpha = 0.58f),
-                                fontSize = 12.sp,
+                                fontSize = SettingsType.Body,
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "Accepts images: ${if (it.acceptsImages) "Yes" else "No"}",
                                 color = Color.White.copy(alpha = 0.58f),
-                                fontSize = 12.sp,
+                                fontSize = SettingsType.Body,
                             )
                         }
                     }
@@ -526,7 +669,7 @@ private fun SecureApiKeyCard(
                 Text(
                     text = message,
                     color = Color.White.copy(alpha = 0.45f),
-                    fontSize = 12.sp,
+                    fontSize = SettingsType.Body,
                 )
             }
         }
@@ -551,9 +694,20 @@ private fun TechRow(
         }
         Spacer(modifier = Modifier.width(10.dp))
         Column {
-            Text(text = title, color = Color.White.copy(alpha = 0.68f), fontWeight = FontWeight.SemiBold, fontSize = 13.sp)
+            Text(
+                text = title,
+                color = Color.White.copy(alpha = 0.68f),
+                fontFamily = SpaceGroteskFontFamily,
+                fontWeight = FontWeight.SemiBold,
+                fontSize = SettingsType.Title,
+            )
             Spacer(modifier = Modifier.height(2.dp))
-            Text(text = description, color = Color.White.copy(alpha = 0.28f), fontSize = 12.sp)
+            Text(
+                text = description,
+                color = Color.White.copy(alpha = 0.28f),
+                fontSize = SettingsType.Body,
+                lineHeight = 18.sp,
+            )
         }
     }
 }
