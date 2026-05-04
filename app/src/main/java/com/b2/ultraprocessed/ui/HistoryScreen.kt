@@ -31,9 +31,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.b2.ultraprocessed.R
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import com.b2.ultraprocessed.ui.theme.Emerald400
 import com.b2.ultraprocessed.ui.theme.Emerald500
@@ -52,34 +54,21 @@ fun HistoryScreen(
             .background(DarkBg),
     ) {
         AppHeader(
-            title = "History",
-            subtitle = AppBrand.name,
+            title = stringResource(R.string.history_title),
+            subtitle = stringResource(R.string.history_subtitle),
             navigationAction = backHeaderAction(onBack),
         )
 
         UsageSummaryCard(summary = historySummary)
 
-        Surface(
-            color = Color.White.copy(alpha = 0.03f),
-            shape = RoundedCornerShape(12.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+        UiInfoCard(
+            title = stringResource(R.string.history_local_only_title),
+            body = stringResource(R.string.history_local_only_body),
+            accentColor = Emerald400,
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 20.dp, vertical = 8.dp),
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(Icons.Default.Warning, contentDescription = null, tint = Color.White.copy(alpha = 0.2f), modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Stored locally via Room DB · No cloud sync",
-                    color = Color.White.copy(alpha = 0.25f),
-                    fontSize = 11.sp,
-                )
-            }
-        }
+        )
 
         if (historyItems.isEmpty()) {
             Box(
@@ -89,7 +78,7 @@ fun HistoryScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "No scans yet. Scan or upload an ingredient label to build local history.",
+                    text = stringResource(R.string.history_empty_state),
                     color = Color.White.copy(alpha = 0.4f),
                 )
             }
@@ -230,29 +219,29 @@ private fun UsageSummaryCard(
                 }
                 Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = "Usage snapshot",
-                        color = Color.White.copy(alpha = 0.72f),
-                        fontWeight = FontWeight.SemiBold,
-                    )
-                    Text(
-                        text = "${summary.totalScans} scans · estimated from stored model usage",
-                        color = Color.White.copy(alpha = 0.34f),
-                        fontSize = 11.sp,
-                    )
+            Text(
+                text = stringResource(R.string.history_usage_snapshot),
+                color = Color.White.copy(alpha = 0.72f),
+                fontWeight = FontWeight.SemiBold,
+            )
+            Text(
+                text = stringResource(R.string.history_usage_subtitle, summary.totalScans),
+                color = Color.White.copy(alpha = 0.34f),
+                fontSize = 11.sp,
+            )
                 }
             }
 
             Spacer(modifier = Modifier.height(14.dp))
 
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-                MetricPill(
-                    label = "Tokens",
+                UiMetricPill(
+                    label = stringResource(R.string.history_tokens_label),
                     value = formatTokens(summary.totalTokens),
                     modifier = Modifier.weight(1f),
                 )
-                MetricPill(
-                    label = "Estimated cost",
+                UiMetricPill(
+                    label = stringResource(R.string.history_estimated_cost_label),
                     value = formatMoney(summary.estimatedCostUsd),
                     modifier = Modifier.weight(1f),
                 )
@@ -279,44 +268,21 @@ private fun UsageSummaryCard(
                                 )
                                 Spacer(modifier = Modifier.height(2.dp))
                                 Text(
-                                    text = "${usage.scans} scan${if (usage.scans == 1) "" else "s"} · ${formatTokens(usage.estimatedTokens)} tokens · ${formatMoney(usage.estimatedCostUsd)}",
-                                    color = Color.White.copy(alpha = 0.32f),
-                                    fontSize = 10.sp,
-                                )
-                            }
+                                text = stringResource(
+                                    R.string.history_model_scans,
+                                    usage.scans,
+                                    if (usage.scans == 1) "" else "s",
+                                    formatTokens(usage.estimatedTokens),
+                                    formatMoney(usage.estimatedCostUsd),
+                                ),
+                                color = Color.White.copy(alpha = 0.32f),
+                                fontSize = 10.sp,
+                            )
+                        }
                         }
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun MetricPill(
-    label: String,
-    value: String,
-    modifier: Modifier = Modifier,
-) {
-    Surface(
-        color = Color.White.copy(alpha = 0.03f),
-        shape = RoundedCornerShape(18.dp),
-        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
-        modifier = modifier,
-    ) {
-        Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
-            Text(
-                text = label,
-                color = Color.White.copy(alpha = 0.34f),
-                fontSize = 11.sp,
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = value,
-                color = Color.White.copy(alpha = 0.92f),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-            )
         }
     }
 }

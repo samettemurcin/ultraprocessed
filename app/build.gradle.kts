@@ -11,20 +11,21 @@ plugins {
 fun String.asBuildConfigStringLiteral(): String =
     "\"" + replace("\\", "\\\\").replace("\"", "\\\"") + "\""
 
-fun readLocalProperty(name: String): String {
-    val propertiesFile = rootProject.file("local.properties")
-    if (!propertiesFile.exists()) return ""
-    val properties = Properties()
-    propertiesFile.inputStream().use { properties.load(it) }
-    return properties.getProperty(name).orEmpty().trim()
-}
-
 val releaseVersionCode = providers.gradleProperty("ZEST_VERSION_CODE")
     .map(String::toInt)
     .orElse(1)
 val releaseVersionName = providers.gradleProperty("ZEST_VERSION_NAME")
     .orElse("1.0.0")
-val usdaBootstrapApiKeyB64 = readLocalProperty("ZEST_USDA_BOOTSTRAP_API_KEY_B64")
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.layout.projectDirectory.file("local.properties").asFile
+    if (localPropertiesFile.isFile) {
+        localPropertiesFile.inputStream().use { load(it) }
+    }
+}
+val usdaBootstrapApiKeyB64 = localProperties
+    .getProperty("ZEST_USDA_BOOTSTRAP_API_KEY_B64")
+    .orEmpty()
+    .trim()
 val releaseStoreFile = providers.environmentVariable("ZEST_RELEASE_STORE_FILE").orNull
 val releaseStorePassword = providers.environmentVariable("ZEST_RELEASE_STORE_PASSWORD").orNull
 val releaseKeyAlias = providers.environmentVariable("ZEST_RELEASE_KEY_ALIAS").orNull
@@ -106,24 +107,31 @@ kotlin {
     }
 }
 
-gradle.taskGraph.whenReady {
-    val releaseArtifactTaskRequested = allTasks.any { task ->
-        task.path == ":app:assembleRelease" ||
-            task.path == ":app:bundleRelease" ||
-            task.path == ":app:packageRelease"
-    }
-    if (releaseArtifactTaskRequested && !hasReleaseSigning) {
-        throw GradleException(
-            "Release signing is required. Set ZEST_RELEASE_STORE_FILE, " +
-                "ZEST_RELEASE_STORE_PASSWORD, ZEST_RELEASE_KEY_ALIAS, and " +
-                "ZEST_RELEASE_KEY_PASSWORD before producing release artifacts."
-        )
+val verifyReleaseSigning = tasks.register("verifyReleaseSigning") {
+    group = "verification"
+    description = "Fails release artifact generation if signing material is missing."
+    doLast {
+        if (!hasReleaseSigning) {
+            throw GradleException(
+                "Release signing is required. Set ZEST_RELEASE_STORE_FILE, " +
+                    "ZEST_RELEASE_STORE_PASSWORD, ZEST_RELEASE_KEY_ALIAS, and " +
+                    "ZEST_RELEASE_KEY_PASSWORD before producing release artifacts."
+            )
+        }
     }
 }
 
+tasks.matching {
+    it.path == ":app:assembleRelease" ||
+        it.path == ":app:bundleRelease" ||
+        it.path == ":app:packageRelease"
+}.configureEach {
+    dependsOn(verifyReleaseSigning)
+}
+
 ksp {
-    arg("room.schemaLocation", "$projectDir/schemas")
     arg("room.incremental", "true")
+    arg("room.schemaLocation", "$projectDir/schemas")
 }
 
 dependencies {

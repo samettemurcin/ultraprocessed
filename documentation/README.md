@@ -11,6 +11,7 @@ This folder is the handoff surface for Zest. Each document explains one producti
 - [05-usda-networking.md](05-usda-networking.md) - USDA lookup, retries, cache behavior, and failure modes.
 - [06-storage-security.md](06-storage-security.md) - encrypted secrets, Room history, image retention, and privacy boundaries.
 - [07-testing-release.md](07-testing-release.md) - debug tests, release verification, and hardening checklist.
+- [08-llm-api-contracts.md](08-llm-api-contracts.md) - exact LLM request flow, response classes, validation pass, and retry semantics.
 
 ## Current Product Contract
 
@@ -96,4 +97,3 @@ flowchart TB
 - Do not put secret values in `BuildConfig`, Compose state, or repo text files.
 - Do not merge allergens into ingredient coloring.
 - Do not return long clause-like items in ingredient arrays.
-

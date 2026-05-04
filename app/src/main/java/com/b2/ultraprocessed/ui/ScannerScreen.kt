@@ -54,6 +54,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -64,6 +65,7 @@ import androidx.camera.view.PreviewView
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.b2.ultraprocessed.R
 import com.b2.ultraprocessed.barcode.BarcodeLiveScanController
 import com.b2.ultraprocessed.camera.CameraCaptureController
 import com.b2.ultraprocessed.camera.LocalImageImportController
@@ -119,6 +121,13 @@ fun ScannerScreen(
     val hasFrontCamera = remember {
         context.packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_FRONT)
     }
+    val permissionRequiredText = stringResource(R.string.scanner_camera_permission_required)
+    val noPhotoSelectedText = stringResource(R.string.scanner_no_photo_selected)
+    val enableCameraFeedText = stringResource(R.string.scanner_enable_camera_feed)
+    val previewDisabledTestSafeText = stringResource(R.string.scanner_preview_disabled_test_safe)
+    val cameraPreviewDisabledBuildText = stringResource(R.string.scanner_camera_preview_disabled_build)
+    val cameraStillStartingText = stringResource(R.string.scanner_camera_still_starting)
+    val usdaMissingLookupText = stringResource(R.string.scanner_usda_missing_lookup)
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
     ) { granted ->
@@ -126,14 +135,14 @@ fun ScannerScreen(
         cameraStatusMessage = if (granted) {
             null
         } else {
-            "Camera permission is required for live scanning."
+            permissionRequiredText
         }
     }
     val galleryLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.GetContent(),
     ) { uri ->
         if (uri == null) {
-            cameraStatusMessage = "No photo selected."
+            cameraStatusMessage = noPhotoSelectedText
             return@rememberLauncherForActivityResult
         }
 
@@ -239,7 +248,7 @@ fun ScannerScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Add a USDA API key in Settings for barcode → USDA product lookup.",
+                        text = stringResource(R.string.analysis_api_key_missing),
                         color = Amber400.copy(alpha = 0.84f),
                         fontSize = 12.sp,
                     )
@@ -271,7 +280,7 @@ fun ScannerScreen(
                     )
                     Spacer(modifier = Modifier.width(12.dp))
                     Text(
-                        text = "Add an LLM API key in Settings for image extraction, NOVA classification, and allergen detection.",
+                        text = stringResource(R.string.analysis_api_key_missing),
                         color = Amber400.copy(alpha = 0.72f),
                         fontSize = 12.sp,
                     )
@@ -356,9 +365,9 @@ fun ScannerScreen(
                         ) {
                             Text(
                                 text = if (enableLiveCamera) {
-                                    "Camera access needed"
+                                    stringResource(R.string.analysis_camera_permission_needed)
                                 } else {
-                                    "Scanner preview disabled"
+                                    stringResource(R.string.analysis_scanner_disabled)
                                 },
                                 color = Color.White.copy(alpha = 0.82f),
                                 fontWeight = FontWeight.SemiBold,
@@ -366,9 +375,9 @@ fun ScannerScreen(
                             Spacer(modifier = Modifier.height(8.dp))
                             Text(
                                 text = if (enableLiveCamera) {
-                                    cameraStatusMessage ?: "Enable camera permission to see the live feed."
+                                    cameraStatusMessage ?: enableCameraFeedText
                                 } else {
-                                    "Camera preview is intentionally disabled in this test-safe mode."
+                                    previewDisabledTestSafeText
                                 },
                                 color = Color.White.copy(alpha = 0.38f),
                                 fontSize = 12.sp,
@@ -392,7 +401,7 @@ fun ScannerScreen(
                                         )
                                         Spacer(modifier = Modifier.width(8.dp))
                                         Text(
-                                            text = "Enable Camera",
+                                            text = stringResource(R.string.analysis_enable_camera),
                                             color = Emerald400,
                                             fontWeight = FontWeight.SemiBold,
                                         )
@@ -476,14 +485,14 @@ fun ScannerScreen(
                 Text(
                     text = when (scannerMode) {
                         ScannerMode.Label -> if (useFrontCamera) {
-                            "Front camera · label analysis ready"
+                            stringResource(R.string.scanner_front_label_ready)
                         } else {
-                            "CameraX Preview · label analysis ready"
+                            stringResource(R.string.scanner_back_label_ready)
                         }
                         ScannerMode.BarcodeLive -> if (useFrontCamera) {
-                            "Front camera · live barcode"
+                            stringResource(R.string.scanner_front_barcode_ready)
                         } else {
-                            "Live barcode · USDA product lookup"
+                            stringResource(R.string.scanner_back_barcode_ready)
                         }
                     },
                     color = Color.White.copy(alpha = 0.3f),
@@ -501,8 +510,8 @@ fun ScannerScreen(
         ) {
             Text(
                 text = when (scannerMode) {
-                    ScannerMode.Label -> "AIM AT THE INGREDIENT LABEL"
-                    ScannerMode.BarcodeLive -> "AIM AT THE PRODUCT BARCODE"
+                    ScannerMode.Label -> stringResource(R.string.analysis_aim_label)
+                    ScannerMode.BarcodeLive -> stringResource(R.string.analysis_aim_barcode)
                 },
                 color = Color.White.copy(alpha = 0.35f),
                 fontSize = 11.sp,
@@ -531,7 +540,7 @@ fun ScannerScreen(
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         Text(
-                            text = "Back to label scan",
+                            text = stringResource(R.string.scanner_back_to_label_scan),
                             color = Color.White.copy(alpha = 0.85f),
                             fontWeight = FontWeight.Bold,
                         )
@@ -541,7 +550,7 @@ fun ScannerScreen(
                 Button(
                     onClick = {
                         if (!enableLiveCamera) {
-                            cameraStatusMessage = "Camera preview is disabled in this build."
+                            cameraStatusMessage = cameraPreviewDisabledBuildText
                             return@Button
                         }
 
@@ -551,7 +560,7 @@ fun ScannerScreen(
                         }
 
                         if (!isCameraPipelineReady) {
-                            cameraStatusMessage = "Camera is still starting. Try again in a moment."
+                            cameraStatusMessage = cameraStillStartingText
                             return@Button
                         }
 
@@ -584,7 +593,7 @@ fun ScannerScreen(
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Capturing...",
+                            text = stringResource(R.string.scanner_capturing),
                             color = Color.Black,
                             fontWeight = FontWeight.Bold,
                         )
@@ -592,7 +601,7 @@ fun ScannerScreen(
                         Icon(Icons.Default.CameraAlt, contentDescription = null, tint = Color.Black)
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "Scan Label",
+                            text = stringResource(R.string.scanner_scan_label),
                             color = Color.Black,
                             fontWeight = FontWeight.Bold,
                         )
@@ -616,8 +625,7 @@ fun ScannerScreen(
                         cameraStatusMessage = null
                         scannerMode = ScannerMode.BarcodeLive
                         if (!hasUsdaApiKey) {
-                            cameraStatusMessage =
-                                "USDA API key missing in Settings — barcode lookup will not find products."
+                            cameraStatusMessage = usdaMissingLookupText
                         }
                     },
                     color = Color.White.copy(alpha = 0.04f),
@@ -639,7 +647,7 @@ fun ScannerScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "Scan Barcode",
+                            text = stringResource(R.string.scanner_scan_barcode),
                             color = Color.White.copy(alpha = 0.55f),
                             fontSize = 12.sp,
                         )
@@ -660,8 +668,8 @@ fun ScannerScreen(
                     ) {
                         Text(
                             text = when {
-                                !isBarcodeLiveReady -> "Starting barcode camera…"
-                                else -> "Listening for barcode…"
+                                !isBarcodeLiveReady -> stringResource(R.string.scanner_starting_barcode_camera)
+                                else -> stringResource(R.string.scanner_listening_barcode)
                             },
                             color = Color.White.copy(alpha = 0.55f),
                             fontSize = 12.sp,
@@ -700,7 +708,7 @@ fun ScannerScreen(
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = if (isImporting) "Importing..." else "Upload Photo",
+                            text = if (isImporting) stringResource(R.string.scanner_importing) else stringResource(R.string.scanner_upload_photo),
                             color = Color.White.copy(alpha = 0.5f),
                             fontSize = 12.sp,
                         )
@@ -719,9 +727,9 @@ fun ScannerScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = if (enableLiveCamera) {
-                        "Captured and imported photos are stored locally on this device."
+                        stringResource(R.string.scanner_local_storage_notice)
                     } else {
-                        "Scanner actions are running with live camera disabled for tests."
+                        stringResource(R.string.scanner_local_storage_test_notice)
                     },
                     color = Color.White.copy(alpha = 0.25f),
                     fontSize = 11.sp,

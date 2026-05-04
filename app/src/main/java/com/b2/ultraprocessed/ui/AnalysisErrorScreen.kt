@@ -19,10 +19,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.b2.ultraprocessed.R
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import com.b2.ultraprocessed.ui.theme.Emerald500
 
@@ -41,7 +43,7 @@ fun AnalysisErrorScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
-            text = "Couldn’t analyze label",
+            text = stringResource(R.string.analysis_error_title),
             color = Color.White.copy(alpha = 0.92f),
             fontSize = 22.sp,
             fontWeight = FontWeight.SemiBold,
@@ -65,15 +67,13 @@ fun AnalysisErrorScreen(
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    Text(
-                        text = "Rate limit or quota issue",
-                        color = Color(0xFFFBBF24),
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
+                    UiSectionHeader(
+                        text = stringResource(R.string.analysis_rate_limit_title),
+                        accentColor = Color(0xFFFBBF24),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "The provider returned HTTP 429, which usually means too many requests in a short window or the API quota has been reached.",
+                        text = stringResource(R.string.analysis_rate_limit_body),
                         color = Color.White.copy(alpha = 0.72f),
                         fontSize = 13.sp,
                         lineHeight = 19.sp,
@@ -83,9 +83,9 @@ fun AnalysisErrorScreen(
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
-                        InfoChip("Wait 1-5 minutes")
-                        InfoChip("Try again once")
-                        InfoChip("Check API usage")
+                        InfoChip(stringResource(R.string.analysis_rate_limit_chip_wait))
+                        InfoChip(stringResource(R.string.analysis_rate_limit_chip_retry))
+                        InfoChip(stringResource(R.string.analysis_rate_limit_chip_usage))
                     }
                 }
             }
@@ -101,7 +101,7 @@ fun AnalysisErrorScreen(
             colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
         ) {
             Text(
-                text = "Try again",
+                text = stringResource(R.string.analysis_try_again),
                 color = Color.Black,
                 fontWeight = FontWeight.Bold,
             )

@@ -65,7 +65,9 @@ class FoodAnalysisPipeline(
         onStage(AnalysisStage.ExtractingIngredients)
         val ocr = ocrPipeline.recognizeText(imagePath)
         return when (ocr) {
-            is OcrResult.Failure -> Result.failure(Exception(ocr.message))
+            is OcrResult.Failure -> Result.failure(
+                Exception(ocr.message.toFriendlyAnalysisMessage("Could not read enough ingredient text. Please try again.")),
+            )
             is OcrResult.Success -> classifyFromIngredientsTextApiOnly(
                 rawText = ocr.rawText,
                 sourceImagePath = imagePath,
@@ -172,7 +174,7 @@ class FoodAnalysisPipeline(
                 )
             }
         }
-        return Result.failure(Exception(error))
+        return Result.failure(Exception(error.toFriendlyAnalysisMessage("Analysis unavailable.")))
     }
 
     private suspend fun classifyFromIngredientsTextApiOnly(
@@ -221,7 +223,11 @@ class FoodAnalysisPipeline(
         ) {
             workflow.classifyIngredients(extraction, modelId, onStatus)
         }.getOrElse { error ->
-            return Result.failure(Exception(error.message ?: "API text classification unavailable."))
+            return Result.failure(
+                Exception(
+                    error.toFriendlyAnalysisMessage("API text classification unavailable."),
+                ),
+            )
         }
         val allergens = runLlmStage(
             stageName = "llm_detect_allergens_from_text",
@@ -232,7 +238,7 @@ class FoodAnalysisPipeline(
         }.getOrElse {
             AllergenDetection(
                 allergens = emptyList(),
-                warnings = listOf(it.message ?: "Allergen detection unavailable."),
+                warnings = listOf(it.toFriendlyAnalysisMessage("Allergen detection unavailable.")),
                 confidence = 0f,
             )
         }
@@ -341,10 +347,11 @@ class FoodAnalysisPipeline(
             workflow.extractIngredients(imagePath, modelId, onStatus)
         }.getOrElse { error ->
             if (error is LlmStageTimeoutException) {
-                return Result.failure(Exception(error.message))
+                return Result.failure(Exception(error.message.toFriendlyAnalysisMessage(INVALID_IMAGE_ERROR)))
             }
             AnalysisTelemetry.event("llm_extraction_unavailable")
             AnalysisTelemetry.event("llm_extraction_error=${error.message.orEmpty()}")
+            onStatus("The AI response could not be parsed after several retries. Falling back to OCR.")
             return null
         }
         if (extraction.code == INVALID_IMAGE_CODE) {
@@ -383,7 +390,7 @@ class FoodAnalysisPipeline(
         val allergens = allergenResult.getOrElse { error ->
             AllergenDetection(
                 allergens = emptyList(),
-                warnings = listOf(error.message ?: "Allergen detection was unavailable for this scan."),
+                warnings = listOf(error.toFriendlyAnalysisMessage("Allergen detection was unavailable for this scan.")),
                 confidence = 0f,
             )
         }
@@ -401,6 +408,7 @@ class FoodAnalysisPipeline(
             )
         } else {
             val classificationWarning = classificationResult.exceptionOrNull()?.message
+                ?.toFriendlyAnalysisMessage("LLM classification was unavailable.")
                 ?: "LLM classification was unavailable."
             classifyFromIngredientsTextApiOnly(
                 rawText = ingredientsText,
@@ -504,3 +512,29 @@ private fun IngredientClassification.toClassificationResult(): ClassificationRes
         engine = "Gemini staged LLM",
         ingredientAssessments = ingredientAssessments,
     )
+
+private fun Throwable.toFriendlyAnalysisMessage(defaultMessage: String): String {
+    val message = message.orEmpty().trim()
+    val lower = message.lowercase()
+    return when {
+        this is LlmStageTimeoutException -> message.ifBlank { defaultMessage }
+        lower.contains("could not be validated after") ||
+            lower.contains("failed after contract retries") ||
+            lower.contains("llm response") ||
+            lower.contains("invalid json") ||
+            lower.contains("missing required field") ||
+            lower.contains("incomplete") ||
+            lower.contains("unsupported code") ||
+            lower.contains("no usable ingredient list") ->
+            "The AI returned an unreadable response after several retries. Please try again."
+        lower.contains("429") ||
+            lower.contains("rate limit") ||
+            lower.contains("quota exceeded") ->
+            "The AI service is temporarily busy. Please wait a moment and try again."
+        message.isNotBlank() -> message
+        else -> defaultMessage
+    }
+}
+
+private fun String?.toFriendlyAnalysisMessage(defaultMessage: String): String =
+    this.orEmpty().ifBlank { defaultMessage }

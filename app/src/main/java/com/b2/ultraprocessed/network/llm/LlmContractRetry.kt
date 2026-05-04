@@ -28,6 +28,12 @@ internal suspend fun <T> retryContractParse(
             return parse(response)
         } catch (error: IOException) {
             if (!error.isContractViolation() || attempt == LLM_CONTRACT_RETRY_ATTEMPTS) {
+                if (error.isContractViolation()) {
+                    throw IOException(
+                        "$operationLabel could not be validated after $LLM_CONTRACT_RETRY_ATTEMPTS attempts.",
+                        error,
+                    )
+                }
                 throw error
             }
             previousError = error.message.orEmpty()

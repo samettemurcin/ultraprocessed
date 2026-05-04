@@ -50,8 +50,11 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.b2.ultraprocessed.R
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import com.b2.ultraprocessed.ui.theme.DarkerBg
 import com.b2.ultraprocessed.ui.theme.Amber400
@@ -75,11 +78,15 @@ fun ResultsScreen(
             .background(DarkBg),
     ) {
         AppHeader(
-            title = if (result.isBarcodeLookupOnly) "Product found" else "Analysis",
-            subtitle = if (result.isBarcodeLookupOnly) {
-                "USDA FoodData Central · barcode lookup"
+            title = if (result.isBarcodeLookupOnly) {
+                stringResource(R.string.results_title_product_found)
             } else {
-                "Nova Classification"
+                stringResource(R.string.results_title_analysis)
+            },
+            subtitle = if (result.isBarcodeLookupOnly) {
+                stringResource(R.string.results_subtitle_usda_lookup)
+            } else {
+                stringResource(R.string.results_subtitle_nova_classification)
             },
             navigationAction = backHeaderAction(onScanAgain),
             actions = listOf(
@@ -125,7 +132,11 @@ fun ResultsScreen(
                     colors = ButtonDefaults.buttonColors(containerColor = Emerald500),
                 ) {
                     Text(
-                        text = if (result.isBarcodeLookupOnly) "Scan again" else "Scan another label",
+                        text = if (result.isBarcodeLookupOnly) {
+                            stringResource(R.string.results_scan_again)
+                        } else {
+                            stringResource(R.string.results_scan_another_label)
+                        },
                         color = Color.Black,
                         fontWeight = FontWeight.Bold,
                     )
@@ -142,7 +153,7 @@ fun ResultsScreen(
                 ) {
                     Icon(Icons.Default.History, contentDescription = null)
                     Spacer(modifier = Modifier.width(8.dp))
-                    Text("Open history")
+                    Text(stringResource(R.string.results_open_history))
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
@@ -178,54 +189,33 @@ private fun BarcodeLookupResultBody(result: ScanResultUi) {
         fontWeight = FontWeight.SemiBold,
         lineHeight = 28.sp,
     )
-    if (!result.brandOwner.isNullOrBlank()) {
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = result.brandOwner.orEmpty(),
-            color = Color.White.copy(alpha = 0.55f),
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-        )
-    }
-    Spacer(modifier = Modifier.height(12.dp))
-    if (!result.scannedBarcode.isNullOrBlank()) {
-        Surface(
-            color = Color.White.copy(alpha = 0.06f),
-            shape = RoundedCornerShape(12.dp),
-            border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.1f)),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Text(
-                    text = "BARCODE",
-                    color = Color.White.copy(alpha = 0.35f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.2.sp,
-                )
+    Spacer(modifier = Modifier.height(10.dp))
+    Surface(
+        color = Color.White.copy(alpha = 0.04f),
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            UiMetaLine(
+                label = stringResource(R.string.results_source_label),
+                value = result.sourceLabel,
+            )
+            if (!result.brandOwner.isNullOrBlank()) {
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(
-                    text = result.scannedBarcode.orEmpty(),
-                    color = Color.White.copy(alpha = 0.88f),
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Medium,
-                    letterSpacing = 1.sp,
+                UiMetaLine(
+                    label = stringResource(R.string.results_brand_label),
+                    value = result.brandOwner.orEmpty(),
+                )
+            }
+            if (!result.scannedBarcode.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                UiMetaLine(
+                    label = stringResource(R.string.results_barcode_label),
+                    value = result.scannedBarcode.orEmpty(),
                 )
             }
         }
-    }
-    Spacer(modifier = Modifier.height(14.dp))
-    Surface(
-        color = Color.White.copy(alpha = 0.08f),
-        shape = RoundedCornerShape(100.dp),
-    ) {
-        Text(
-            text = "Source: ${result.sourceLabel}",
-            color = Color.White.copy(alpha = 0.72f),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-        )
     }
     Spacer(modifier = Modifier.height(20.dp))
     Text(
@@ -236,7 +226,7 @@ private fun BarcodeLookupResultBody(result: ScanResultUi) {
     )
     Spacer(modifier = Modifier.height(16.dp))
     Text(
-        text = "Database reference, not medical advice. For a full label read, scan the ingredient panel with the camera.",
+        text = stringResource(R.string.results_image_note),
         color = Color.White.copy(alpha = 0.34f),
         fontSize = 11.sp,
         lineHeight = 16.sp,
@@ -255,6 +245,11 @@ private fun FullAnalysisResultBody(
     val headline = shopperHeadline(result.novaGroup)
     val ingredientItems = remember(result.ingredientAssessments) {
         result.ingredientAssessments
+            .filterNot { assessment ->
+                assessment.name.startsWith("contains:", ignoreCase = true) ||
+                    assessment.name.startsWith("may contain", ignoreCase = true)
+            }
+            .sortedWith(compareBy<IngredientBubbleUi> { it.novaGroup }.thenBy { it.name.lowercase() })
     }
 
     Text(
@@ -264,35 +259,33 @@ private fun FullAnalysisResultBody(
         fontWeight = FontWeight.SemiBold,
         lineHeight = 24.sp,
     )
-    Spacer(modifier = Modifier.height(6.dp))
     Spacer(modifier = Modifier.height(8.dp))
     Surface(
-        color = Color.White.copy(alpha = 0.08f),
-        shape = RoundedCornerShape(100.dp),
+        color = Color.White.copy(alpha = 0.04f),
+        shape = RoundedCornerShape(16.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color.White.copy(alpha = 0.06f)),
+        modifier = Modifier.fillMaxWidth(),
     ) {
-        Text(
-            text = "Source: ${result.sourceLabel}",
-            color = Color.White.copy(alpha = 0.72f),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.SemiBold,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 4.dp),
-        )
-    }
-    if (!result.brandOwner.isNullOrBlank()) {
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = "Brand: ${result.brandOwner}",
-            color = Color.White.copy(alpha = 0.42f),
-            fontSize = 12.sp,
-        )
-    }
-    if (!result.scannedBarcode.isNullOrBlank()) {
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            text = "Barcode: ${result.scannedBarcode}",
-            color = Color.White.copy(alpha = 0.42f),
-            fontSize = 12.sp,
-        )
+        Column(modifier = Modifier.padding(14.dp)) {
+            UiMetaLine(
+                label = stringResource(R.string.results_source_label),
+                value = result.sourceLabel,
+            )
+            if (!result.brandOwner.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                UiMetaLine(
+                    label = stringResource(R.string.results_brand_label),
+                    value = result.brandOwner.orEmpty(),
+                )
+            }
+            if (!result.scannedBarcode.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                UiMetaLine(
+                    label = stringResource(R.string.results_barcode_label),
+                    value = result.scannedBarcode.orEmpty(),
+                )
+            }
+        }
     }
 
     Spacer(modifier = Modifier.height(16.dp))
@@ -376,47 +369,18 @@ private fun FullAnalysisResultBody(
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
-            Text(
-                text = "LABEL DETAIL",
-                color = Color.White.copy(alpha = 0.32f),
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.4.sp,
-            )
+            UiSectionHeader(text = stringResource(R.string.results_label_detail_section))
             Spacer(modifier = Modifier.height(10.dp))
             IngredientChips(items = ingredientItems)
-            if (result.allergens.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(16.dp))
-                Surface(
-                    color = Color(0x0E38BDF8),
-                    shape = RoundedCornerShape(16.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x2638BDF8)),
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Column(modifier = Modifier.padding(14.dp)) {
-                        Text(
-                            text = "ALLERGENS",
-                            color = Color(0xFF7DD3FC),
-                            fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = 1.4.sp,
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        FlowRow(
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            result.allergens.forEach { allergen ->
-                                AllergenBubble(allergen)
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 
     Spacer(modifier = Modifier.height(16.dp))
+
+    if (result.allergens.isNotEmpty()) {
+        AllergenSection(allergens = result.allergens)
+        Spacer(modifier = Modifier.height(16.dp))
+    }
 
     ResultChatSection(
         enabled = chatEnabled,
@@ -432,7 +396,7 @@ private fun FullAnalysisResultBody(
     }
 
     Text(
-        text = "NOVA groups foods by processing (1 = minimal → 4 = ultra-processed). This app analyzes visible label evidence and is not a full nutrition or allergen audit.",
+        text = stringResource(R.string.results_footer_note),
         color = Color.White.copy(alpha = 0.34f),
         fontSize = 11.sp,
         lineHeight = 16.sp,
@@ -448,13 +412,7 @@ private fun ScannedLabelPhotoSection(imagePath: String?) {
     val bitmap = remember(imagePath) { decodeSampledBitmap(imagePath, maxSidePx = 960) }
     if (bitmap == null) return
 
-    Text(
-        text = "YOUR SCAN",
-        color = Color.White.copy(alpha = 0.32f),
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.4.sp,
-    )
+    UiSectionHeader(text = stringResource(R.string.results_scan_title))
     Spacer(modifier = Modifier.height(8.dp))
     Surface(
         color = Color.White.copy(alpha = 0.04f),
@@ -473,7 +431,7 @@ private fun ScannedLabelPhotoSection(imagePath: String?) {
             )
             Spacer(modifier = Modifier.height(8.dp))
             Text(
-                text = "This is the image analyzed for ingredient extraction. Zoom the real ingredient list when you can.",
+                text = stringResource(R.string.results_scan_note),
                 color = Color.White.copy(alpha = 0.38f),
                 fontSize = 11.sp,
                 lineHeight = 15.sp,
@@ -513,7 +471,7 @@ private fun IngredientChips(
 ) {
     if (items.isEmpty()) {
         Text(
-            text = "Per-ingredient NOVA data was not returned by the API for this scan.",
+            text = stringResource(R.string.results_no_ingredient_nova),
             color = Color.White.copy(alpha = 0.38f),
             fontSize = 12.sp,
             lineHeight = 17.sp,
@@ -521,8 +479,8 @@ private fun IngredientChips(
         return
     }
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         items.forEach { item ->
             IngredientBubble(
@@ -539,20 +497,63 @@ private fun IngredientBubble(
     val palette = ingredientPalette(item.novaGroup)
     Surface(
         color = palette.fill,
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(999.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, palette.border),
-        modifier = Modifier.widthIn(max = 180.dp),
+        modifier = Modifier
+            .height(28.dp)
+            .widthIn(max = 220.dp),
     ) {
-        Text(
-            text = item.name,
-            color = palette.text,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            lineHeight = 15.sp,
+        Box(
             modifier = Modifier
-                .widthIn(max = 180.dp)
-                .padding(horizontal = 10.dp, vertical = 7.dp),
-        )
+                .height(28.dp)
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = item.name.toChipLabel(),
+                color = palette.text,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                lineHeight = 12.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 196.dp),
+            )
+        }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AllergenSection(allergens: List<String>) {
+    Surface(
+        color = Color(0x0E38BDF8),
+        shape = RoundedCornerShape(18.dp),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x2638BDF8)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            UiSectionHeader(
+                text = stringResource(R.string.results_allergens_section),
+                accentColor = Color(0xFF7DD3FC),
+            )
+            Text(
+                text = stringResource(R.string.results_allergens_disclaimer),
+                color = Color.White.copy(alpha = 0.36f),
+                fontSize = 10.sp,
+                lineHeight = 14.sp,
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                allergens.forEach { allergen ->
+                    AllergenBubble(allergen)
+                }
+            }
+        }
     }
 }
 
@@ -560,21 +561,49 @@ private fun IngredientBubble(
 private fun AllergenBubble(label: String) {
     Surface(
         color = Color(0x1438BDF8),
-        shape = RoundedCornerShape(14.dp),
+        shape = RoundedCornerShape(999.dp),
         border = androidx.compose.foundation.BorderStroke(1.dp, Color(0x2D38BDF8)),
-        modifier = Modifier.widthIn(max = 180.dp),
+        modifier = Modifier
+            .height(28.dp)
+            .widthIn(max = 180.dp),
     ) {
-        Text(
-            text = label,
-            color = Color(0xFFBDE7FF),
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Medium,
-            lineHeight = 15.sp,
+        Box(
             modifier = Modifier
-                .widthIn(max = 180.dp)
-                .padding(horizontal = 10.dp, vertical = 7.dp),
-        )
+                .height(28.dp)
+                .padding(horizontal = 12.dp),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(
+                text = label.toChipLabel(),
+                color = Color(0xFFBDE7FF),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Medium,
+                lineHeight = 12.sp,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.widthIn(max = 156.dp),
+            )
+        }
     }
+}
+
+private fun String.toChipLabel(): String =
+    trim()
+        .trimEnd('.', ',', ';')
+        .replace(Regex("\\s+"), " ")
+        .split(" ")
+        .joinToString(" ") { token -> token.toReadableToken() }
+
+private fun String.toReadableToken(): String {
+    if (length <= 4 && any(Char::isLetter) && all { it.isUpperCase() || !it.isLetter() }) {
+        return this
+    }
+    val firstLetter = indexOfFirst(Char::isLetter)
+    if (firstLetter == -1) return this
+    val chars = lowercase().toCharArray()
+    chars[firstLetter] = chars[firstLetter].uppercaseChar()
+    return String(chars)
 }
 
 @Composable
@@ -586,12 +615,9 @@ private fun DataWarningBlock(warnings: List<String>) {
         modifier = Modifier.fillMaxWidth(),
     ) {
         Column(modifier = Modifier.padding(14.dp)) {
-            Text(
-                text = "DATA WARNING",
-                color = Amber400,
-                fontSize = 10.sp,
-                fontWeight = FontWeight.Bold,
-                letterSpacing = 1.sp,
+            UiSectionHeader(
+                text = stringResource(R.string.results_data_warning_section),
+                accentColor = Amber400,
             )
             Spacer(modifier = Modifier.height(6.dp))
             warnings.forEach { warning ->
@@ -617,18 +643,12 @@ private fun ResultChatSection(
     var input by remember(result.productName, result.rawIngredientText, result.summary) { mutableStateOf("") }
     var isSending by remember(result.productName, result.rawIngredientText, result.summary) { mutableStateOf(false) }
     var statusMessage by remember(result.productName, result.rawIngredientText, result.summary) { mutableStateOf<String?>(null) }
+    val checkingContextText = stringResource(R.string.results_chat_status_checking)
+    val assistantUnavailableText = stringResource(R.string.results_chat_unavailable)
     val messages = remember(result.productName, result.rawIngredientText, result.summary) {
         mutableStateListOf<ResultChatMessageUi>()
     }
 
-    Text(
-        text = "ASK ABOUT THIS RESULT",
-        color = Color.White.copy(alpha = 0.32f),
-        fontSize = 10.sp,
-        fontWeight = FontWeight.Bold,
-        letterSpacing = 1.4.sp,
-    )
-    Spacer(modifier = Modifier.height(8.dp))
     Surface(
         color = Color.White.copy(alpha = 0.04f),
         shape = RoundedCornerShape(18.dp),
@@ -637,33 +657,26 @@ private fun ResultChatSection(
     ) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text(
-                text = "Ask only about this scan. The assistant is locked to the current result and refuses unrelated or injected instructions.",
-                color = Color.White.copy(alpha = 0.42f),
-                fontSize = 11.sp,
-                lineHeight = 16.sp,
+                text = stringResource(R.string.results_chat_section),
+                color = Color.White.copy(alpha = 0.82f),
+                fontSize = 14.sp,
+                fontWeight = FontWeight.SemiBold,
             )
-            Spacer(modifier = Modifier.height(12.dp))
 
-            Surface(
-                color = Color.White.copy(alpha = 0.03f),
-                shape = RoundedCornerShape(14.dp),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = 160.dp, max = 260.dp),
-            ) {
-                Column(
+            if (messages.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Surface(
+                    color = Color.White.copy(alpha = 0.03f),
+                    shape = RoundedCornerShape(14.dp),
                     modifier = Modifier
-                        .padding(12.dp)
-                        .verticalScroll(rememberScrollState()),
+                        .fillMaxWidth()
+                        .heightIn(max = 180.dp),
                 ) {
-                    if (messages.isEmpty()) {
-                        Text(
-                            text = "Try asking what ingredient is the biggest concern, whether any allergens were detected, or how the NOVA group was chosen.",
-                            color = Color.White.copy(alpha = 0.36f),
-                            fontSize = 12.sp,
-                            lineHeight = 17.sp,
-                        )
-                    } else {
+                    Column(
+                        modifier = Modifier
+                            .padding(12.dp)
+                            .verticalScroll(rememberScrollState()),
+                    ) {
                         messages.forEach { message ->
                             ChatMessageBubble(message = message)
                             Spacer(modifier = Modifier.height(10.dp))
@@ -673,7 +686,7 @@ private fun ResultChatSection(
             }
 
             if (!statusMessage.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = statusMessage.orEmpty(),
                     color = Amber400.copy(alpha = 0.9f),
@@ -683,36 +696,28 @@ private fun ResultChatSection(
             }
 
             Spacer(modifier = Modifier.height(12.dp))
-            OutlinedTextField(
-                value = input,
-                onValueChange = { input = it },
-                enabled = enabled && !isSending,
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = {
-                    Text(
-                        text = if (enabled) {
-                            "Ask about this scan only"
-                        } else {
-                            "Add an API key to enable chat"
-                        },
-                    )
-                },
-                minLines = 2,
-                maxLines = 4,
-                shape = RoundedCornerShape(16.dp),
-            )
-            Spacer(modifier = Modifier.height(10.dp))
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = "No off-topic questions. No prompt injection.",
-                    color = Color.White.copy(alpha = 0.28f),
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
+                OutlinedTextField(
+                    value = input,
+                    onValueChange = { input = it },
+                    enabled = enabled && !isSending,
+                    modifier = Modifier.weight(1f),
+                    placeholder = {
+                        Text(
+                            text = if (enabled) {
+                                stringResource(R.string.results_chat_placeholder_enabled)
+                            } else {
+                                stringResource(R.string.results_chat_placeholder_disabled)
+                            },
+                        )
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(999.dp),
                 )
+                Spacer(modifier = Modifier.width(8.dp))
                 IconButton(
                     onClick = {
                         val question = input.trim()
@@ -725,7 +730,7 @@ private fun ResultChatSection(
                             ),
                         )
                         input = ""
-                        statusMessage = "Checking the result context..."
+                        statusMessage = checkingContextText
                         isSending = true
                         scope.launch {
                             val reply = onAskAboutResult(question) { status ->
@@ -750,7 +755,7 @@ private fun ResultChatSection(
                                         id = "e${messages.size}",
                                         role = ResultChatRole.Assistant,
                                         text = error.message.orEmpty().ifBlank {
-                                            "The result assistant is temporarily unavailable."
+                                            assistantUnavailableText
                                         },
                                         allowed = false,
                                     ),

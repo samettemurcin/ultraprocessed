@@ -240,12 +240,7 @@ fun AnalyzingScreen(
                         .border(1.dp, Emerald500.copy(alpha = 0.22f), RoundedCornerShape(16.dp)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(
-                        text = AppBrand.monogram,
-                        color = Emerald400,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp,
-                    )
+                    AppBrandMark(sizeDp = 36, fontSizeSp = 16)
                 }
             }
 

@@ -35,11 +35,11 @@ class OpenAiCompatibleFoodLabelLlmWorkflow(
         modelId: String,
         onStatus: (String) -> Unit,
     ): Result<IngredientExtraction> = withContext(Dispatchers.IO) {
-        runCatching {
+        try {
             val apiKey = requireApiKey()
             val prompt = readPrompt(INGREDIENT_EXTRACTION_PROMPT)
             val encodedImage = encodeImageForModel(imagePath)
-            retryContractParse(
+            val extractionCandidate = retryContractParse(
                 operationLabel = "ingredient extraction",
                 onStatus = onStatus,
                 buildPrompt = { attempt, previousError ->
@@ -53,8 +53,19 @@ class OpenAiCompatibleFoodLabelLlmWorkflow(
                         apiKey = apiKey,
                     )
                 },
+                parse = { json -> json },
+            )
+            val extraction = validateModelOutput(
+                operationLabel = "ingredient extraction",
+                candidate = extractionCandidate,
+                modelId = modelId,
+                apiKey = apiKey,
+                onStatus = onStatus,
                 parse = ::parseIngredientExtraction,
             )
+            Result.success(extraction)
+        } catch (t: Throwable) {
+            Result.failure(t)
         }
     }
 
@@ -63,10 +74,10 @@ class OpenAiCompatibleFoodLabelLlmWorkflow(
         modelId: String,
         onStatus: (String) -> Unit,
     ): Result<IngredientClassification> = withContext(Dispatchers.IO) {
-        runCatching {
+        try {
             val apiKey = requireApiKey()
             val prompt = readPrompt(CLASSIFICATION_PROMPT)
-            retryContractParse(
+            val classificationCandidate = retryContractParse(
                 operationLabel = "classification",
                 onStatus = onStatus,
                 buildPrompt = { attempt, previousError ->
@@ -80,8 +91,19 @@ class OpenAiCompatibleFoodLabelLlmWorkflow(
                         apiKey = apiKey,
                     )
                 },
+                parse = { json -> json },
+            )
+            val classification = validateModelOutput(
+                operationLabel = "classification",
+                candidate = classificationCandidate,
+                modelId = modelId,
+                apiKey = apiKey,
+                onStatus = onStatus,
                 parse = ::parseIngredientClassification,
             )
+            Result.success(classification)
+        } catch (t: Throwable) {
+            Result.failure(t)
         }
     }
 
@@ -90,10 +112,10 @@ class OpenAiCompatibleFoodLabelLlmWorkflow(
         modelId: String,
         onStatus: (String) -> Unit,
     ): Result<AllergenDetection> = withContext(Dispatchers.IO) {
-        runCatching {
+        try {
             val apiKey = requireApiKey()
             val prompt = readPrompt(ALLERGEN_PROMPT)
-            retryContractParse(
+            val allergensCandidate = retryContractParse(
                 operationLabel = "allergen detection",
                 onStatus = onStatus,
                 buildPrompt = { attempt, previousError ->
@@ -107,8 +129,19 @@ class OpenAiCompatibleFoodLabelLlmWorkflow(
                         apiKey = apiKey,
                     )
                 },
+                parse = { json -> json },
+            )
+            val allergens = validateModelOutput(
+                operationLabel = "allergen detection",
+                candidate = allergensCandidate,
+                modelId = modelId,
+                apiKey = apiKey,
+                onStatus = onStatus,
                 parse = ::parseAllergenDetection,
             )
+            Result.success(allergens)
+        } catch (t: Throwable) {
+            Result.failure(t)
         }
     }
 
@@ -209,6 +242,38 @@ class OpenAiCompatibleFoodLabelLlmWorkflow(
             throw IOException("LLM food-label workflow returned no text.")
         }
         return parseResponseJson(content)
+    }
+
+    private suspend fun <T> validateModelOutput(
+        operationLabel: String,
+        candidate: JSONObject,
+        modelId: String,
+        apiKey: String,
+        onStatus: (String) -> Unit,
+        parse: (JSONObject) -> T,
+    ): T {
+        val prompt = readPrompt(VALIDATION_PROMPT)
+        onStatus("Validating $operationLabel output")
+        return retryContractParse(
+            operationLabel = "$operationLabel validation",
+            onStatus = onStatus,
+            buildPrompt = { attempt, previousError ->
+                prompt + buildContractRepairSuffix("$operationLabel validation", attempt, previousError)
+            },
+            request = { repairedPrompt ->
+                executeJsonRequest(
+                    requestBody = buildTextRequestBody(
+                        repairedPrompt,
+                        buildValidationInput(operationLabel, candidate),
+                        modelId,
+                    ),
+                    operation = "${operationLabel.replace(' ', '_')}_validation",
+                    modelId = modelId,
+                    apiKey = apiKey,
+                )
+            },
+            parse = parse,
+        )
     }
 
     private fun parseResponseJson(text: String): JSONObject {
@@ -313,6 +378,7 @@ class OpenAiCompatibleFoodLabelLlmWorkflow(
         private const val INGREDIENT_EXTRACTION_PROMPT = "prompts/food_label_ingredient_extraction_prompt.md"
         private const val CLASSIFICATION_PROMPT = "prompts/food_label_classification_prompt.md"
         private const val ALLERGEN_PROMPT = "prompts/food_label_allergen_prompt.md"
+        private const val VALIDATION_PROMPT = "prompts/food_label_response_validation_prompt.md"
         private const val MAX_IMAGE_DIMENSION = 1600
         private const val JPEG_QUALITY = 86
         private const val INVALID_EXTRACTION_CODE = -1
@@ -431,3 +497,8 @@ private fun IngredientExtraction.toPromptJson(): JSONObject =
         .put("ingredients", JSONArray(ingredients))
         .put("extractionConfidence", confidence)
         .put("extractionWarnings", JSONArray(warnings))
+
+private fun buildValidationInput(operationLabel: String, candidate: JSONObject): JSONObject =
+    JSONObject()
+        .put("operation", operationLabel)
+        .put("candidate", candidate)

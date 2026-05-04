@@ -1,16 +1,16 @@
 package com.b2.ultraprocessed.ui
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -21,7 +21,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -29,8 +28,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.b2.ultraprocessed.ui.theme.Emerald400
-import com.b2.ultraprocessed.ui.theme.Emerald600
 
 data class AppHeaderAction(
     val icon: ImageVector,
@@ -68,27 +65,7 @@ fun AppHeader(
                 Spacer(modifier = Modifier.width(10.dp))
             }
 
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(
-                        Brush.linearGradient(listOf(Emerald400, Emerald600)),
-                        RoundedCornerShape(14.dp),
-                    )
-                    .border(
-                        1.dp,
-                        Color.White.copy(alpha = 0.12f),
-                        RoundedCornerShape(14.dp),
-                    ),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    text = AppBrand.monogram,
-                    color = Color.Black,
-                    fontWeight = FontWeight.ExtraBold,
-                    fontSize = 16.sp,
-                )
-            }
+            AppBrandMark(sizeDp = 40, fontSizeSp = 16)
 
             Spacer(modifier = Modifier.width(12.dp))
 
@@ -122,6 +99,16 @@ fun AppHeader(
 
 @Composable
 private fun HeaderActionButton(action: AppHeaderAction) {
+    val buttonModifier = Modifier
+        .size(40.dp)
+        .let { base ->
+            if (action.testTag != null) {
+                base.testTag(action.testTag)
+            } else {
+                base
+            }
+        }
+
     Box {
         Surface(
             onClick = action.onClick,
@@ -131,15 +118,7 @@ private fun HeaderActionButton(action: AppHeaderAction) {
                 width = 1.dp,
                 color = Color.White.copy(alpha = 0.08f),
             ),
-            modifier = Modifier
-                .size(40.dp)
-                .then(
-                    if (action.testTag != null) {
-                        Modifier.testTag(action.testTag)
-                    } else {
-                        Modifier
-                    },
-                ),
+            modifier = buttonModifier,
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(

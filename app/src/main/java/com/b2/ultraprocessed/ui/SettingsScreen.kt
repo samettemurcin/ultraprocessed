@@ -50,12 +50,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.b2.ultraprocessed.R
 import com.b2.ultraprocessed.ui.theme.DarkBg
 import com.b2.ultraprocessed.ui.theme.Emerald400
 import com.b2.ultraprocessed.ui.theme.Emerald500
@@ -107,8 +109,8 @@ fun SettingsScreen(
             .background(DarkBg),
     ) {
         AppHeader(
-            title = "Settings",
-            subtitle = AppBrand.name,
+            title = stringResource(R.string.settings_title),
+            subtitle = stringResource(R.string.settings_subtitle),
             navigationAction = backHeaderAction(onBack),
         )
 
@@ -118,16 +120,16 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(horizontal = 20.dp),
         ) {
-            SectionHeader(icon = Icons.Default.Key, text = "LLM API Key")
+            UiSectionHeader(text = stringResource(R.string.settings_llm_key_section), icon = Icons.Default.Key)
             SecureApiKeyCard(
                 hasKey = hasLlmApiKey,
-                storedDescription = "An LLM API key is stored locally with Android Keystore-backed encryption. Enter a new key only when you want to replace it.",
-                emptyDescription = "Your LLM API key is stored locally with Android Keystore-backed encryption. The saved value is never shown again after it is stored.",
-                emptyLabel = "LLM API key",
-                replacementLabel = "Replacement LLM API key",
-                saveLabel = "Save LLM key",
-                replaceLabel = "Replace LLM key",
-                deleteLabel = "Delete LLM key",
+                storedDescription = stringResource(R.string.settings_llm_key_stored_description),
+                emptyDescription = stringResource(R.string.settings_llm_key_empty_description),
+                emptyLabel = stringResource(R.string.settings_llm_key_empty_label),
+                replacementLabel = stringResource(R.string.settings_llm_key_replacement_label),
+                saveLabel = stringResource(R.string.settings_llm_key_save_button),
+                replaceLabel = stringResource(R.string.settings_llm_key_replace_button),
+                deleteLabel = stringResource(R.string.settings_llm_key_delete_button),
                 metadata = llmKeyMetadata ?: selectedModel?.let {
                     KeyMetadata(
                         modelName = it.name,
@@ -142,22 +144,22 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            SectionHeader(icon = Icons.Default.Info, text = "Under the Hood")
+            UiSectionHeader(text = stringResource(R.string.settings_app_features_section), icon = Icons.Default.Info)
             Surface(
                 color = Color.White.copy(alpha = 0.03f),
                 shape = RoundedCornerShape(18.dp),
                 modifier = Modifier.fillMaxWidth(),
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
-                    TechRow(Icons.Default.CameraAlt, "CameraX", "Camera preview & image capture")
+                    TechRow(Icons.Default.CameraAlt, "Camera", stringResource(R.string.settings_feature_camera))
                     Spacer(modifier = Modifier.height(10.dp))
-                    TechRow(Icons.Default.Visibility, "ML Kit Text Recognition v2", "On-device OCR engine")
+                    TechRow(Icons.Default.Visibility, "OCR", stringResource(R.string.settings_feature_ocr))
                     Spacer(modifier = Modifier.height(10.dp))
-                    TechRow(Icons.Default.Storage, "Room Database", "Local scan history & cached results")
+                    TechRow(Icons.Default.Storage, "History", stringResource(R.string.settings_feature_history))
                     Spacer(modifier = Modifier.height(10.dp))
-                    TechRow(Icons.Default.Security, "Android Keystore", "Encrypted API key storage")
+                    TechRow(Icons.Default.Security, "Security", stringResource(R.string.settings_feature_security))
                     Spacer(modifier = Modifier.height(10.dp))
-                    TechRow(Icons.Default.Memory, "OkHttp", "Direct HTTPS calls to model APIs")
+                    TechRow(Icons.Default.Memory, "Network", stringResource(R.string.settings_feature_network))
                 }
             }
 
@@ -171,14 +173,14 @@ fun SettingsScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Privacy-First Design",
+                        text = stringResource(R.string.settings_privacy_title),
                         color = Emerald400.copy(alpha = 0.7f),
                         fontWeight = FontWeight.SemiBold,
                         fontSize = 12.sp,
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "No sign-in required. When an LLM key is saved, label images are sent for ingredient extraction and extracted ingredient text is sent for classification and allergen detection. Scan history stays in local Room DB. API keys are encrypted via Android Keystore. DataStore handles preferences.",
+                        text = stringResource(R.string.settings_privacy_body),
                         color = Color.White.copy(alpha = 0.34f),
                         fontSize = 12.sp,
                         lineHeight = 18.sp,
@@ -203,27 +205,6 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(28.dp))
         }
-    }
-}
-
-@Composable
-private fun SectionHeader(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    text: String,
-) {
-    Row(
-        modifier = Modifier.padding(bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = Emerald400, modifier = Modifier.size(16.dp))
-        Spacer(modifier = Modifier.width(8.dp))
-        Text(
-            text = text,
-            color = Color.White.copy(alpha = 0.34f),
-            fontSize = 11.sp,
-            fontWeight = FontWeight.Bold,
-            letterSpacing = 1.8.sp,
-        )
     }
 }
 
@@ -494,7 +475,7 @@ private fun SecureApiKeyCard(
                     ) {
                         Column(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp)) {
                             Text(
-                                text = "API Metadata",
+                                text = stringResource(R.string.settings_api_metadata),
                                 color = Emerald400.copy(alpha = 0.72f),
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.SemiBold,

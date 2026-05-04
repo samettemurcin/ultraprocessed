@@ -6,6 +6,7 @@
 .gradle/
 build/
 **/build/
+gradle/gradle-daemon-jvm.properties
 
 # Local machine / SDK config
 local.properties
