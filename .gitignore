@@ -49,6 +49,9 @@ app/build/*
 Ultra Processed Food Scanner/node_modules/
 Ultra Processed Food Scanner/dist/
 
+# Figma exports are design reference payloads, not Android source.
+FigmaDesign/
+
 # Retired Android source paths. These were removed from the product, but macOS
 # FileProvider/APFS can resurrect deleted historical files as dataless
 # placeholders under Documents. If they appear again, keep them out of Git and
